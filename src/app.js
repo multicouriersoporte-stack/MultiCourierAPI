@@ -1,85 +1,104 @@
-import express from 'express';
-import jwt from 'jsonwebtoken';
-import materiaprimaRoutes from './routes/materiaprima.routes.js';
-import usuariosRoutes from './routes/usuarios.routes.js';
-import corteRoutes from './routes/corte.routes.js';
-import pesoRoutes from './routes/peso.routes.js';
-import tallaRoutes from './routes/talla.routes.js';
-import proveedorRoutes from './routes/proveedor.routes.js';
-import maquinaRoutes from './routes/maquina.routes.js';
-import procesoRoutes from './routes/proceso.routes.js';
-import empaqueRoutes from './routes/empaque.routes.js';
-import { fileURLToPath } from 'url'; // Importar fileURLToPath
-import path from 'path'; // Importar path
-import cors from 'cors'; // Importar cors
+// src/app.js
 
-import pg from 'pg';
-import { config } from 'dotenv';
+import express from "express";
+import cors from "cors";
+import { config } from "dotenv";
 
-config()
+import rutasRoutes from "./routes/ruta.routes.js";
+import trazabilidadRoutes from "./routes/trazabilidad.routes.js";
+import mapapedidosRoutes from "./routes/mapapedidos.routes.js";
+
+import authRoutes from "./routes/auth.routes.js";
+import estadosRoutes from "./routes/estados.routes.js";
+import repartidoresRoutes from "./routes/repartidores.routes.js";
+import repartidorubicacionRoutes from "./routes/repartidorubicacion.routes.js";
+import estadosrepartidorRoutes from "./routes/estadosrepartidor.routes.js";
+import usuariosRoutes from "./routes/usuarios.routes.js";
+import clientesRoutes from "./routes/clientes.routes.js";
+import localesRoutes from "./routes/locales.routes.js";
+import localproductosRoutes from "./routes/localproductos.routes.js";
+import pedidosRoutes from "./routes/pedidos.routes.js";
+import pedidodetallesRoutes from "./routes/pedidodetalles.routes.js";
+import pedidorepartidoresRoutes from "./routes/pedidorepartidores.routes.js";
+import pedidosseleccionrepartidorRoutes from "./routes/pedidosseleccionrepartidor.routes.js";
+import pedidoobservacionesRoutes from "./routes/pedidoobservaciones.routes.js";
+import productosRoutes from "./routes/productos.routes.js";
+import pagolocalesRoutes from "./routes/pagoslocales.routes.js";
+import pagorepartidorRoutes from "./routes/pagosrepartidor.routes.js";
+import billeterasRoutes from "./routes/billeteras.routes.js";
+import metodospagoRoutes from "./routes/metodospago.routes.js";
+import rolesRoutes from "./routes/roles.routes.js";
+import usuariorolesRoutes from "./routes/usuarioroles.routes.js";
+import provinciasRoutes from "./routes/provincias.routes.js";
+import cantonesRoutes from "./routes/cantones.routes.js";
+
+config();
 
 const app = express();
-app.use(express.json()); // Para que interprete los objetos json
 
-const pool = new pg.Pool({
-    connectionString: process.env.BD_DATABASE_URL
-})
+// MIDDLEWARES
+app.use(express.json());
 
-// Definir módulo de ES
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Configuración de CORS
 const corsOptions = {
-    origin: '*', // Dirección del dominio del servidor
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    credentials: true
+    origin: "*",
+    methods: [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE"
+    ]
 };
-app.use(cors(corsOptions)); // Aquí ahora funciona correctamente
 
-// Rutas
-app.use('/api', materiaprimaRoutes);
-app.use('/api', usuariosRoutes);
-app.use('/api', corteRoutes);
-app.use('/api', pesoRoutes);
-app.use('/api', tallaRoutes);
-app.use('/api', proveedorRoutes);
-app.use('/api', maquinaRoutes);
-app.use('/api', procesoRoutes);
-app.use('/api', empaqueRoutes);
+app.use(cors(corsOptions));
 
-// Ruta de prueba para API
+// RUTAS
+app.use("/api/auth", authRoutes);
+
+app.use("/api", rutasRoutes);
+app.use("/api", trazabilidadRoutes);
+app.use("/api", mapapedidosRoutes);
+
+app.use("/api", clientesRoutes);
+app.use("/api", estadosRoutes);
+app.use("/api", repartidoresRoutes);
+app.use("/api", repartidorubicacionRoutes);
+app.use("/api", estadosrepartidorRoutes);
+app.use("/api", usuariosRoutes);
+app.use("/api", localesRoutes);
+app.use("/api", localproductosRoutes);
+
+app.use("/api", pedidosRoutes);
+app.use("/api", pedidodetallesRoutes);
+app.use("/api", pedidorepartidoresRoutes);
+app.use("/api", pedidosseleccionrepartidorRoutes);
+app.use("/api", pedidoobservacionesRoutes);
+
+app.use("/api", productosRoutes);
+app.use("/api", pagolocalesRoutes);
+app.use("/api", pagorepartidorRoutes);
+app.use("/api", billeterasRoutes);
+app.use("/api", metodospagoRoutes);
+
+app.use("/api", rolesRoutes);
+app.use("/api", usuariorolesRoutes);
+app.use("/api", provinciasRoutes);
+app.use("/api", cantonesRoutes);
+
+// PRUEBA API
 app.get("/api", (req, res) => {
     res.json({
-        mensaje: "Nodejs and JWT"
+        success: true,
+        mensaje: "API funcionando correctamente"
     });
 });
 
-// Ruta de login para generar un token JWT
-app.get("/api/login", (req, res) => {
-    const user = {
-        id: 1,
-        nombre: "Maritza",
-        email: "kchalen14@gmail.com"
-    };
-
-    jwt.sign({ user }, 'secretkey', (err, token) => {
-        res.json({
-            token
-        });
+// ENDPOINT NO ENCONTRADO
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: "Endpoint not found"
     });
-});
-
-// Manejo de rutas no encontradas
-app.use((req, res, next) => {
-    res.status(400).json({
-        message: 'Endpoint not found'
-    });
-});
-
-// Iniciar servidor
-app.listen(3001, function() {
-    console.log("Node.js app running on port 3001...");
 });
 
 export default app;
