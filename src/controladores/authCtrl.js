@@ -1,6 +1,6 @@
 // src/controladores/authCtrl.js
 import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { conmysql } from "../db.js";
 import { config } from "dotenv";
 
