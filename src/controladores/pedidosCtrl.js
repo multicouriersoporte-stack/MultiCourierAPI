@@ -5,10 +5,7 @@ import { asignarRepartidorAutomaticamente } from "./pedidorepartidoresCtrl.js";
 
 const ROLES_ADMINISTRATIVOS = ["CENTRAL", "SUPERVISOR", "SOPORTE"];
 
-// ============================================================
 // AUTENTICACIÓN Y ROLES
-// ============================================================
-
 const obtenerRol = req => {
     const usuario = req.usuario || {};
     const rol = usuario.usuario_rol ?? usuario.rol_usuario ?? usuario.usuarioRol ?? usuario.rol ?? usuario.role ?? usuario.usuario_role ?? "";
@@ -17,10 +14,8 @@ const obtenerRol = req => {
 
 const obtenerRoles = req => {
     const usuario = req.usuario || {};
-    return [obtenerRol(req), ...(Array.isArray(usuario.roles) ? usuario.roles : [])]
-        .filter(Boolean)
-        .map(rol => String(rol).trim().toUpperCase())
-        .filter((rol, i, array) => array.indexOf(rol) === i);
+    const roles = [obtenerRol(req), ...(Array.isArray(usuario.roles) ? usuario.roles : []), ...(Array.isArray(usuario.usuario_roles) ? usuario.usuario_roles : [])];
+    return roles.filter(Boolean).map(rol => String(rol).trim().toUpperCase()).filter((rol, index, array) => array.indexOf(rol) === index);
 };
 
 const tieneRol = (req, rolesPermitidos = []) => {
@@ -36,10 +31,7 @@ const obtenerIdUsuario = req => {
     return usuario.id_usuario ?? usuario.usuario_id ?? usuario.idUsuario ?? usuario.id ?? null;
 };
 
-// ============================================================
 // RELACIONES USUARIO -> ENTIDAD
-// ============================================================
-
 const obtenerClienteDelUsuario = async id_usuario => {
     if (!id_usuario) return null;
     const [clientes] = await conmysql.query(`SELECT id_cliente FROM clientes WHERE id_usuario = ? LIMIT 1`, [id_usuario]);
@@ -58,10 +50,7 @@ const obtenerRepartidorDelUsuario = async id_usuario => {
     return repartidores.length ? repartidores[0].id_repartidor : null;
 };
 
-// ============================================================
-// VALIDACIONES Y UTILIDADES
-// ============================================================
-
+// VALIDACIONES
 const esIdValido = id => Number.isInteger(Number(id)) && Number(id) > 0;
 
 const generarPedidoPin = () => String(Math.floor(Math.random() * 10000)).padStart(4, "0");
@@ -75,14 +64,11 @@ const convertirFechaMySQL = fecha => {
 };
 
 const obtenerIdEstadoPorNombre = async nombreEstado => {
-    const [estados] = await conmysql.query(
-        `SELECT id_estado FROM estados WHERE UPPER(TRIM(estado_nombre)) = ? LIMIT 1`,
-        [String(nombreEstado).trim().toUpperCase()]
-    );
+    const [estados] = await conmysql.query(`SELECT id_estado FROM estados WHERE UPPER(TRIM(estado_nombre)) = ? LIMIT 1`, [String(nombreEstado).trim().toUpperCase()]);
     return estados.length ? estados[0].id_estado : null;
 };
 
-// El PIN solo se muestra al cliente.
+// SEGURIDAD DEL PIN
 const ocultarPedidoPin = (pedido, req) => {
     if (!pedido) return pedido;
     const copia = { ...pedido };
@@ -90,9 +76,12 @@ const ocultarPedidoPin = (pedido, req) => {
     return copia;
 };
 
-const ocultarPedidosPin = (pedidos, req) => Array.isArray(pedidos) ? pedidos.map(pedido => ocultarPedidoPin(pedido, req)) : pedidos;
+const ocultarPedidosPin = (pedidos, req) => {
+    if (!Array.isArray(pedidos)) return pedidos;
+    return pedidos.map(pedido => ocultarPedidoPin(pedido, req));
+};
 
-// Los administradores pueden acceder a cualquier cliente.
+// ACCESO CLIENTE
 const verificarAccesoCliente = async (req, res, id_cliente) => {
     if (!req.usuario) {
         res.status(401).json({ success: false, message: "Usuario no autenticado." });
@@ -126,26 +115,21 @@ const verificarAccesoCliente = async (req, res, id_cliente) => {
     return false;
 };
 
-// ============================================================
-// CONSULTAS
-// ============================================================
-
+// OBTENER PEDIDO POR ID - INTERNO
 const obtenerPedidoPorIdInterno = async id_pedido => {
     const [pedidos] = await conmysql.query(`
         SELECT p.*, c.cliente_codigo, c.id_usuario AS cliente_id_usuario,
-            u.usuario_cedula AS cliente_cedula, u.usuario_nombre AS cliente_nombre,
-            u.usuario_apellido AS cliente_apellido, u.usuario_nombre_completo AS cliente_nombre_completo,
-            u.usuario_email AS cliente_email, u.usuario_telefono AS cliente_telefono,
-            l.local_codigo, l.local_nombre_comercial, l.local_razon_social,
-            l.local_telefono, l.local_email, e.estado_nombre,
-            mp.metodo_pago_nombre, mp.metodo_pago_descripcion,
-            r.id_repartidor, r.id_usuario AS repartidor_id_usuario, r.repartidor_codigo,
-            r.repartidor_placa, r.repartidor_tipo_vehiculo, r.repartidor_calificacion,
-            r.repartidor_posicion_ranking, r.repartidor_total_pedidos,
-            r.repartidor_pedidos_aceptados, r.repartidor_pedidos_rechazados,
-            r.repartidor_porcentaje_aceptacion,
-            ur.usuario_nombre AS repartidor_nombre, ur.usuario_apellido AS repartidor_apellido,
-            ur.usuario_nombre_completo AS repartidor_nombre_completo, ur.usuario_telefono AS repartidor_telefono
+        u.usuario_cedula AS cliente_cedula, u.usuario_nombre AS cliente_nombre,
+        u.usuario_apellido AS cliente_apellido, u.usuario_nombre_completo AS cliente_nombre_completo,
+        u.usuario_email AS cliente_email, u.usuario_telefono AS cliente_telefono,
+        l.local_codigo, l.local_nombre_comercial, l.local_razon_social, l.local_telefono, l.local_email,
+        e.estado_nombre, mp.metodo_pago_nombre, mp.metodo_pago_descripcion,
+        r.id_repartidor, r.id_usuario AS repartidor_id_usuario, r.repartidor_codigo,
+        r.repartidor_placa, r.repartidor_tipo_vehiculo, r.repartidor_calificacion,
+        r.repartidor_posicion_ranking, r.repartidor_total_pedidos, r.repartidor_pedidos_aceptados,
+        r.repartidor_pedidos_rechazados, r.repartidor_porcentaje_aceptacion,
+        ur.usuario_nombre AS repartidor_nombre, ur.usuario_apellido AS repartidor_apellido,
+        ur.usuario_nombre_completo AS repartidor_nombre_completo, ur.usuario_telefono AS repartidor_telefono
         FROM pedidos p
         LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
         LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
@@ -160,6 +144,7 @@ const obtenerPedidoPorIdInterno = async id_pedido => {
     return pedidos.length ? pedidos[0] : null;
 };
 
+// LISTAR PEDIDOS SEGÚN ROL
 export const getPedidos = async (req, res) => {
     try {
         if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
@@ -167,16 +152,15 @@ export const getPedidos = async (req, res) => {
         const roles = obtenerRoles(req);
         const id_usuario = obtenerIdUsuario(req);
 
-        // Administradores ven todos los pedidos.
         if (esAdministrativo(req)) {
             const [result] = await conmysql.query(`
                 SELECT p.*, c.cliente_codigo, c.id_usuario AS cliente_id_usuario,
-                    u.usuario_nombre AS cliente_nombre, u.usuario_apellido AS cliente_apellido,
-                    u.usuario_nombre_completo AS cliente_nombre_completo, u.usuario_cedula AS cliente_cedula,
-                    u.usuario_email AS cliente_email, u.usuario_telefono AS cliente_telefono,
-                    l.local_codigo, l.local_nombre_comercial, l.local_razon_social,
-                    l.local_telefono, l.local_email, e.estado_nombre,
-                    mp.metodo_pago_nombre, mp.metodo_pago_descripcion, r.repartidor_codigo
+                u.usuario_nombre AS cliente_nombre, u.usuario_apellido AS cliente_apellido,
+                u.usuario_nombre_completo AS cliente_nombre_completo, u.usuario_cedula AS cliente_cedula,
+                u.usuario_email AS cliente_email, u.usuario_telefono AS cliente_telefono,
+                l.local_codigo, l.local_nombre_comercial, l.local_razon_social, l.local_telefono, l.local_email,
+                e.estado_nombre, mp.metodo_pago_nombre, mp.metodo_pago_descripcion,
+                r.id_repartidor, r.repartidor_codigo
                 FROM pedidos p
                 LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
                 LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
@@ -189,16 +173,16 @@ export const getPedidos = async (req, res) => {
             return res.json(ocultarPedidosPin(result, req));
         }
 
-        // Cada rol consulta únicamente sus pedidos.
         if (tieneRol(req, ["CLIENTE"])) {
             if (!id_usuario) return res.status(401).json({ success: false, message: "No se pudo identificar al usuario." });
+
             const id_cliente = await obtenerClienteDelUsuario(id_usuario);
             if (!id_cliente) return res.json([]);
 
             const [result] = await conmysql.query(`
                 SELECT p.*, c.cliente_codigo, l.local_codigo, l.local_nombre_comercial,
-                    l.local_razon_social, l.local_telefono, e.estado_nombre,
-                    mp.metodo_pago_nombre, mp.metodo_pago_descripcion
+                l.local_razon_social, l.local_telefono, e.estado_nombre,
+                mp.metodo_pago_nombre, mp.metodo_pago_descripcion
                 FROM pedidos p
                 LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
                 LEFT JOIN locales l ON p.id_local = l.id_local
@@ -206,20 +190,19 @@ export const getPedidos = async (req, res) => {
                 LEFT JOIN metodos_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
                 WHERE p.id_cliente = ? ORDER BY p.id_pedido DESC
             `, [id_cliente]);
-
             return res.json(ocultarPedidosPin(result, req));
         }
 
         if (tieneRol(req, ["REPARTIDOR"])) {
             if (!id_usuario) return res.status(401).json({ success: false, message: "No se pudo identificar al usuario." });
+
             const id_repartidor = await obtenerRepartidorDelUsuario(id_usuario);
             if (!id_repartidor) return res.status(403).json({ success: false, message: "El usuario no tiene un repartidor asociado." });
 
             const [result] = await conmysql.query(`
                 SELECT p.*, c.cliente_codigo, u.usuario_nombre_completo AS cliente_nombre,
-                    u.usuario_telefono AS cliente_telefono, l.local_codigo,
-                    l.local_nombre_comercial, e.estado_nombre,
-                    mp.metodo_pago_nombre, mp.metodo_pago_descripcion
+                u.usuario_telefono AS cliente_telefono, l.local_codigo, l.local_nombre_comercial,
+                e.estado_nombre, mp.metodo_pago_nombre, mp.metodo_pago_descripcion
                 FROM pedidos p
                 LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
                 LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
@@ -228,20 +211,19 @@ export const getPedidos = async (req, res) => {
                 LEFT JOIN metodos_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
                 WHERE p.id_repartidor = ? ORDER BY p.id_pedido DESC
             `, [id_repartidor]);
-
             return res.json(ocultarPedidosPin(result, req));
         }
 
         if (tieneRol(req, ["LOCAL"])) {
             if (!id_usuario) return res.status(401).json({ success: false, message: "No se pudo identificar al usuario." });
+
             const id_local = await obtenerLocalDelUsuario(id_usuario);
             if (!id_local) return res.status(403).json({ success: false, message: "El usuario no tiene un local asociado." });
 
             const [result] = await conmysql.query(`
                 SELECT p.*, c.cliente_codigo, u.usuario_nombre_completo AS cliente_nombre,
-                    u.usuario_telefono AS cliente_telefono, l.local_codigo,
-                    l.local_nombre_comercial, e.estado_nombre,
-                    mp.metodo_pago_nombre, mp.metodo_pago_descripcion
+                u.usuario_telefono AS cliente_telefono, l.local_codigo, l.local_nombre_comercial,
+                e.estado_nombre, mp.metodo_pago_nombre, mp.metodo_pago_descripcion
                 FROM pedidos p
                 LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
                 LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
@@ -250,24 +232,64 @@ export const getPedidos = async (req, res) => {
                 LEFT JOIN metodos_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
                 WHERE p.id_local = ? ORDER BY p.id_pedido DESC
             `, [id_local]);
-
             return res.json(ocultarPedidosPin(result, req));
         }
 
-        return res.status(403).json({
-            success: false,
-            message: `Los roles [${roles.join(", ") || "SIN_ROL"}] no tienen permisos para consultar pedidos.`
-        });
+        return res.status(403).json({ success: false, message: `Los roles [${roles.join(", ") || "SIN_ROL"}] no tienen permisos para consultar pedidos.` });
     } catch (error) {
         console.error("[Pedidos] Error getPedidos:", error);
         return res.status(500).json({ success: false, message: "Error al consultar pedidos" });
     }
 };
 
+// TODOS LOS PEDIDOS - ADMINISTRATIVO
+export const getTodosLosPedidosAdmin = async (req, res) => {
+    try {
+        if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
+
+        const roles = obtenerRoles(req);
+        console.log("[Pedidos Admin] Usuario:", { id_usuario: obtenerIdUsuario(req), roles });
+
+        if (!esAdministrativo(req)) return res.status(403).json({ success: false, message: "No tienes permisos para consultar todos los pedidos.", roles });
+
+        const [pedidos] = await conmysql.query(`
+            SELECT p.*, c.cliente_codigo, c.id_usuario AS cliente_id_usuario,
+            u.usuario_nombre AS cliente_nombre, u.usuario_apellido AS cliente_apellido,
+            u.usuario_nombre_completo AS cliente_nombre_completo, u.usuario_cedula AS cliente_cedula,
+            u.usuario_email AS cliente_email, u.usuario_telefono AS cliente_telefono,
+            l.local_codigo, l.local_nombre_comercial, l.local_razon_social, l.local_telefono, l.local_email,
+            e.estado_nombre, mp.metodo_pago_nombre, mp.metodo_pago_descripcion,
+            r.id_repartidor, r.repartidor_codigo, r.repartidor_placa, r.repartidor_tipo_vehiculo,
+            r.repartidor_calificacion, ur.usuario_nombre AS repartidor_nombre,
+            ur.usuario_apellido AS repartidor_apellido, ur.usuario_nombre_completo AS repartidor_nombre_completo,
+            ur.usuario_telefono AS repartidor_telefono
+            FROM pedidos p
+            LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
+            LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
+            LEFT JOIN locales l ON p.id_local = l.id_local
+            LEFT JOIN estados e ON p.id_estado = e.id_estado
+            LEFT JOIN metodos_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
+            LEFT JOIN repartidores r ON p.id_repartidor = r.id_repartidor
+            LEFT JOIN usuarios ur ON r.id_usuario = ur.id_usuario
+            ORDER BY p.id_pedido DESC
+        `);
+
+        console.log(`[Pedidos Admin] Pedidos encontrados: ${pedidos.length}`);
+        return res.status(200).json(ocultarPedidosPin(pedidos, req));
+    } catch (error) {
+        console.error("[Pedidos Admin] Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error al consultar todos los pedidos.",
+            error: process.env.NODE_ENV === "development" ? error.message : undefined
+        });
+    }
+};
+
+// PEDIDO POR ID
 export const getPedidoPorId = async (req, res) => {
     try {
         const { id } = req.params;
-
         if (!esIdValido(id)) return res.status(400).json({ success: false, message: "El ID del pedido no es válido." });
         if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
 
@@ -275,26 +297,22 @@ export const getPedidoPorId = async (req, res) => {
         if (!pedido) return res.status(404).json({ success: false, message: "Pedido no encontrado" });
 
         if (esAdministrativo(req)) {
-            // Acceso completo.
+            // Acceso administrativo permitido.
         } else if (tieneRol(req, ["CLIENTE"])) {
             if (!await verificarAccesoCliente(req, res, pedido.id_cliente)) return;
         } else if (tieneRol(req, ["REPARTIDOR"])) {
             const id_repartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
-            if (Number(pedido.id_repartidor) !== Number(id_repartidor)) {
-                return res.status(403).json({ success: false, message: "No puedes acceder a este pedido." });
-            }
+            if (Number(pedido.id_repartidor) !== Number(id_repartidor)) return res.status(403).json({ success: false, message: "No puedes acceder a este pedido." });
         } else if (tieneRol(req, ["LOCAL"])) {
             const id_local = await obtenerLocalDelUsuario(obtenerIdUsuario(req));
-            if (Number(pedido.id_local) !== Number(id_local)) {
-                return res.status(403).json({ success: false, message: "No puedes acceder a este pedido." });
-            }
+            if (Number(pedido.id_local) !== Number(id_local)) return res.status(403).json({ success: false, message: "No puedes acceder a este pedido." });
         } else {
             return res.status(403).json({ success: false, message: "No tienes permisos para acceder a este pedido." });
         }
 
         const [detalles] = await conmysql.query(`
             SELECT pd.*, p.pedido_codigo, lp.id_local, lp.id_producto,
-                l.local_nombre_comercial, pr.producto_codigo, pr.producto_nombre
+            l.local_nombre_comercial, pr.producto_codigo, pr.producto_nombre
             FROM pedido_detalles pd
             LEFT JOIN pedidos p ON pd.id_pedido = p.id_pedido
             LEFT JOIN local_productos lp ON pd.id_local_producto = lp.id_local_producto
@@ -311,6 +329,7 @@ export const getPedidoPorId = async (req, res) => {
     }
 };
 
+// PEDIDOS POR CLIENTE
 export const getPedidosPorCliente = async (req, res) => {
     try {
         const { id_cliente } = req.params;
@@ -319,8 +338,8 @@ export const getPedidosPorCliente = async (req, res) => {
 
         const [result] = await conmysql.query(`
             SELECT p.*, c.cliente_codigo, l.local_codigo, l.local_nombre_comercial,
-                l.local_razon_social, e.estado_nombre, mp.metodo_pago_nombre,
-                mp.metodo_pago_descripcion, r.repartidor_codigo
+            l.local_razon_social, e.estado_nombre, mp.metodo_pago_nombre,
+            mp.metodo_pago_descripcion, r.repartidor_codigo
             FROM pedidos p
             LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
             LEFT JOIN locales l ON p.id_local = l.id_local
@@ -337,6 +356,7 @@ export const getPedidosPorCliente = async (req, res) => {
     }
 };
 
+// PEDIDOS POR LOCAL
 export const getPedidosPorLocal = async (req, res) => {
     try {
         const { id_local } = req.params;
@@ -352,9 +372,8 @@ export const getPedidosPorLocal = async (req, res) => {
 
         const [result] = await conmysql.query(`
             SELECT p.*, c.cliente_codigo, u.usuario_nombre_completo AS cliente_nombre,
-                u.usuario_telefono AS cliente_telefono, l.local_codigo,
-                l.local_nombre_comercial, e.estado_nombre, mp.metodo_pago_nombre,
-                r.repartidor_codigo
+            u.usuario_telefono AS cliente_telefono, l.local_codigo, l.local_nombre_comercial,
+            e.estado_nombre, mp.metodo_pago_nombre, r.repartidor_codigo
             FROM pedidos p
             LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
             LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
@@ -372,6 +391,7 @@ export const getPedidosPorLocal = async (req, res) => {
     }
 };
 
+// PEDIDO POR CÓDIGO
 export const getPedidoPorCodigo = async (req, res) => {
     try {
         if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
@@ -381,10 +401,10 @@ export const getPedidoPorCodigo = async (req, res) => {
 
         const [result] = await conmysql.query(`
             SELECT p.*, c.cliente_codigo, u.usuario_nombre AS cliente_nombre,
-                u.usuario_apellido AS cliente_apellido, u.usuario_nombre_completo AS cliente_nombre_completo,
-                u.usuario_telefono AS cliente_telefono, l.local_codigo,
-                l.local_nombre_comercial, l.local_razon_social, e.estado_nombre,
-                mp.metodo_pago_nombre, mp.metodo_pago_descripcion, r.repartidor_codigo
+            u.usuario_apellido AS cliente_apellido, u.usuario_nombre_completo AS cliente_nombre_completo,
+            u.usuario_telefono AS cliente_telefono, l.local_codigo, l.local_nombre_comercial,
+            l.local_razon_social, e.estado_nombre, mp.metodo_pago_nombre,
+            mp.metodo_pago_descripcion, r.repartidor_codigo
             FROM pedidos p
             LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
             LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
@@ -425,6 +445,7 @@ export const getPedidoPorCodigo = async (req, res) => {
     }
 };
 
+// PEDIDOS POR ESTADO
 export const getPedidosPorEstado = async (req, res) => {
     try {
         const { id_estado } = req.params;
@@ -433,8 +454,8 @@ export const getPedidosPorEstado = async (req, res) => {
 
         const [result] = await conmysql.query(`
             SELECT p.*, c.cliente_codigo, u.usuario_nombre_completo AS cliente_nombre,
-                l.local_codigo, l.local_nombre_comercial, e.estado_nombre,
-                mp.metodo_pago_nombre, r.repartidor_codigo
+            l.local_codigo, l.local_nombre_comercial, e.estado_nombre,
+            mp.metodo_pago_nombre, r.repartidor_codigo
             FROM pedidos p
             LEFT JOIN clientes c ON p.id_cliente = c.id_cliente
             LEFT JOIN usuarios u ON c.id_usuario = u.id_usuario
@@ -452,11 +473,7 @@ export const getPedidosPorEstado = async (req, res) => {
     }
 };
 
-// ============================================================
 // CREAR PEDIDO
-// ============================================================
-
-// El pedido se crea sin repartidor; se asigna al entrar en EN_PREPARACION.
 export const postPedido = async (req, res) => {
     const conexion = await conmysql.getConnection();
     let id_pedido = null, pedido_pin = null, transaccionIniciada = false;
@@ -478,6 +495,7 @@ export const postPedido = async (req, res) => {
             productos, detalles
         } = req.body;
 
+        // VALIDAR CLIENTE
         if (tieneRol(req, ["CLIENTE"])) {
             const id_usuario = obtenerIdUsuario(req);
             if (!id_usuario) {
@@ -530,6 +548,7 @@ export const postPedido = async (req, res) => {
         if (pedido_local_latitud === undefined || pedido_local_latitud === null) pedido_local_latitud = local.local_latitud;
         if (pedido_local_longitud === undefined || pedido_local_longitud === null) pedido_local_longitud = local.local_longitud;
 
+        // VALIDAR MÉTODO DE PAGO
         if (id_metodo_pago !== undefined && id_metodo_pago !== null) {
             const [metodos] = await conexion.query(`
                 SELECT id_metodo_pago FROM metodos_pago
@@ -539,6 +558,7 @@ export const postPedido = async (req, res) => {
             if (!metodos.length) throw new Error("El método de pago no existe o está inactivo");
         }
 
+        // GENERAR CÓDIGO Y PIN
         const [ultimo] = await conexion.query(`
             SELECT pedido_codigo FROM pedidos
             ORDER BY id_pedido DESC LIMIT 1 FOR UPDATE
@@ -554,43 +574,35 @@ export const postPedido = async (req, res) => {
         pedido_pin = generarPedidoPin();
         const estadoInicial = id_estado ?? 10;
 
+        // INSERTAR PEDIDO
         const [result] = await conexion.query(`
             INSERT INTO pedidos (
                 pedido_codigo, pedido_pin, id_cliente, id_local, id_repartidor,
-                id_local_sucursal, id_metodo_pago, pedido_fecha,
-                pedido_cantidad_productos, pedido_subtotal_local, pedido_subtotal_app,
-                pedido_adicional_volumen, pedido_carrera, pedido_propina, pedido_total,
-                pedido_distancia_km, pedido_tiempo_estimado,
-                pedido_cliente_latitud, pedido_cliente_longitud,
-                pedido_local_latitud, pedido_local_longitud,
-                pedido_observacion, id_estado, pedido_fecha_entrega
-            )
-            VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                id_local_sucursal, id_metodo_pago, pedido_fecha, pedido_cantidad_productos,
+                pedido_subtotal_local, pedido_subtotal_app, pedido_adicional_volumen,
+                pedido_carrera, pedido_propina, pedido_total, pedido_distancia_km,
+                pedido_tiempo_estimado, pedido_cliente_latitud, pedido_cliente_longitud,
+                pedido_local_latitud, pedido_local_longitud, pedido_observacion,
+                id_estado, pedido_fecha_entrega
+            ) VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             pedido_codigo, pedido_pin, id_cliente, id_local,
             id_local_sucursal ?? null, id_metodo_pago ?? null,
             convertirFechaMySQL(pedido_fecha ?? new Date()),
             Number(pedido_cantidad_productos ?? 0),
-            Number(pedido_subtotal_local ?? 0),
-            Number(pedido_subtotal_app ?? 0),
-            Number(pedido_adicional_volumen ?? 0),
-            Number(pedido_carrera ?? 0),
-            Number(pedido_propina ?? 0),
-            Number(pedido_total ?? 0),
-            Number(pedido_distancia_km ?? 0),
-            Number(pedido_tiempo_estimado ?? 0),
-            pedido_cliente_latitud ?? null,
-            pedido_cliente_longitud ?? null,
-            pedido_local_latitud ?? null,
-            pedido_local_longitud ?? null,
-            pedido_observacion ?? null,
-            estadoInicial,
-            pedido_fecha_entrega ?? null
+            Number(pedido_subtotal_local ?? 0), Number(pedido_subtotal_app ?? 0),
+            Number(pedido_adicional_volumen ?? 0), Number(pedido_carrera ?? 0),
+            Number(pedido_propina ?? 0), Number(pedido_total ?? 0),
+            Number(pedido_distancia_km ?? 0), Number(pedido_tiempo_estimado ?? 0),
+            pedido_cliente_latitud ?? null, pedido_cliente_longitud ?? null,
+            pedido_local_latitud ?? null, pedido_local_longitud ?? null,
+            pedido_observacion ?? null, estadoInicial, pedido_fecha_entrega ?? null
         ]);
 
         id_pedido = result.insertId;
         const detallesRegistrados = [];
 
+        // INSERTAR DETALLES
         for (const detalle of listaDetalles) {
             const id_local_producto = Number(detalle.id_local_producto);
             const cantidad = Number(detalle.pedido_detalle_cantidad ?? detalle.cantidad ?? 0);
@@ -600,7 +612,7 @@ export const postPedido = async (req, res) => {
 
             const [productosLocal] = await conexion.query(`
                 SELECT lp.id_local_producto, lp.id_local, lp.id_producto,
-                    pr.producto_codigo, pr.producto_nombre, pr.producto_estado
+                pr.producto_codigo, pr.producto_nombre, pr.producto_estado
                 FROM local_productos lp
                 INNER JOIN productos pr ON lp.id_producto = pr.id_producto
                 WHERE lp.id_local_producto = ? AND lp.id_local = ? FOR UPDATE
@@ -615,13 +627,11 @@ export const postPedido = async (req, res) => {
 
             const precioLocal = Number(detalle.pedido_detalle_precio_local ?? detalle.precioLocal ?? 0);
             const precioApp = Number(detalle.pedido_detalle_precio_app ?? detalle.precioApp ?? 0);
-
             if (!Number.isFinite(precioLocal) || precioLocal < 0) throw new Error(`Precio local inválido para el producto ${id_local_producto}`);
             if (!Number.isFinite(precioApp) || precioApp < 0) throw new Error(`Precio app inválido para el producto ${id_local_producto}`);
 
             const subtotalLocal = Number(detalle.pedido_detalle_subtotal_local ?? detalle.subtotalLocal ?? precioLocal * cantidad);
             const subtotalApp = Number(detalle.pedido_detalle_subtotal_app ?? detalle.subtotalApp ?? precioApp * cantidad);
-
             if (!Number.isFinite(subtotalLocal) || subtotalLocal < 0) throw new Error(`Subtotal local inválido para el producto ${id_local_producto}`);
             if (!Number.isFinite(subtotalApp) || subtotalApp < 0) throw new Error(`Subtotal app inválido para el producto ${id_local_producto}`);
 
@@ -631,8 +641,7 @@ export const postPedido = async (req, res) => {
                     pedido_detalle_precio_local, pedido_detalle_precio_app,
                     pedido_detalle_subtotal_local, pedido_detalle_subtotal_app,
                     pedido_detalle_observacion
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 id_pedido, id_local_producto, cantidad, precioLocal, precioApp,
                 subtotalLocal, subtotalApp,
@@ -641,8 +650,7 @@ export const postPedido = async (req, res) => {
 
             detallesRegistrados.push({
                 id_pedido_detalle: detalleResult.insertId,
-                id_local_producto, cantidad, precioLocal, precioApp,
-                subtotalLocal, subtotalApp
+                id_local_producto, cantidad, precioLocal, precioApp, subtotalLocal, subtotalApp
             });
         }
 
@@ -653,8 +661,7 @@ export const postPedido = async (req, res) => {
 
         const pedidoFinal = await obtenerPedidoPorIdInterno(id_pedido);
         const respuesta = {
-            success: true,
-            id_pedido, pedido_codigo, id_cliente, id_local,
+            success: true, id_pedido, pedido_codigo, id_cliente, id_local,
             id_repartidor: pedidoFinal?.id_repartidor ?? null,
             id_estado: pedidoFinal?.id_estado ?? estadoInicial,
             estado_nombre: pedidoFinal?.estado_nombre ?? null,
@@ -680,12 +687,7 @@ export const postPedido = async (req, res) => {
         console.error("[Pedidos] Error postPedido:", error);
 
         const mensaje = error.message || "Error al registrar pedido";
-        const erroresCliente = [
-            "obligatorio", "no existe", "no está disponible", "debe contener",
-            "cantidad", "producto del local", "Precio", "Subtotal", "fecha",
-            "método de pago"
-        ];
-
+        const erroresCliente = ["obligatorio", "no existe", "no está disponible", "debe contener", "cantidad", "producto del local", "Precio", "Subtotal", "fecha", "método de pago"];
         const esErrorCliente = erroresCliente.some(texto => mensaje.toLowerCase().includes(texto.toLowerCase()));
 
         return res.status(esErrorCliente ? 400 : 500).json({
@@ -697,47 +699,33 @@ export const postPedido = async (req, res) => {
     }
 };
 
-// ============================================================
 // ACTUALIZAR PEDIDO
-// ============================================================
-
 const CAMPOS_PEDIDO_ADMIN = [
-    "pedido_codigo", "id_cliente", "id_local", "id_repartidor", "id_local_sucursal",
-    "id_metodo_pago", "pedido_fecha", "pedido_cantidad_productos",
-    "pedido_subtotal_local", "pedido_subtotal_app", "pedido_adicional_volumen",
-    "pedido_carrera", "pedido_propina", "pedido_total", "pedido_distancia_km",
-    "pedido_tiempo_estimado", "pedido_cliente_latitud", "pedido_cliente_longitud",
-    "pedido_local_latitud", "pedido_local_longitud", "pedido_observacion",
-    "id_estado", "pedido_fecha_entrega"
+    "pedido_codigo", "id_cliente", "id_local", "id_repartidor", "id_local_sucursal", "id_metodo_pago",
+    "pedido_fecha", "pedido_cantidad_productos", "pedido_subtotal_local", "pedido_subtotal_app",
+    "pedido_adicional_volumen", "pedido_carrera", "pedido_propina", "pedido_total",
+    "pedido_distancia_km", "pedido_tiempo_estimado", "pedido_cliente_latitud", "pedido_cliente_longitud",
+    "pedido_local_latitud", "pedido_local_longitud", "pedido_observacion", "id_estado", "pedido_fecha_entrega"
 ];
 
 const CAMPOS_PEDIDO_CLIENTE = [
-    "pedido_observacion",
-    "pedido_cliente_latitud",
-    "pedido_cliente_longitud",
-    "pedido_fecha_entrega"
+    "pedido_observacion", "pedido_cliente_latitud", "pedido_cliente_longitud", "pedido_fecha_entrega"
 ];
 
 export const putPedido = async (req, res) => {
     try {
         const { id } = req.params;
-
         if (!esIdValido(id)) return res.status(400).json({ success: false, message: "El ID del pedido no es válido." });
         if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
 
         const pedido = await obtenerPedidoPorIdInterno(id);
         if (!pedido) return res.status(404).json({ success: false, message: "Pedido no encontrado" });
 
+        // VALIDAR PERMISOS
         if (tieneRol(req, ["REPARTIDOR"])) {
             const id_repartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
-            if (Number(pedido.id_repartidor) !== Number(id_repartidor)) {
-                return res.status(403).json({ success: false, message: "No puedes modificar este pedido." });
-            }
-
-            return res.status(403).json({
-                success: false,
-                message: "El repartidor debe utilizar los endpoints específicos para cambiar el estado del pedido."
-            });
+            if (Number(pedido.id_repartidor) !== Number(id_repartidor)) return res.status(403).json({ success: false, message: "No puedes modificar este pedido." });
+            return res.status(403).json({ success: false, message: "El repartidor debe utilizar los endpoints específicos para cambiar el estado del pedido." });
         }
 
         if (tieneRol(req, ["CLIENTE"])) {
@@ -745,37 +733,24 @@ export const putPedido = async (req, res) => {
         } else if (tieneRol(req, ["LOCAL"])) {
             const id_local = await obtenerLocalDelUsuario(obtenerIdUsuario(req));
             if (!id_local) return res.status(403).json({ success: false, message: "El usuario no tiene un local asociado." });
-            if (Number(pedido.id_local) !== Number(id_local)) {
-                return res.status(403).json({ success: false, message: "No puedes modificar pedidos de otro local." });
-            }
+            if (Number(pedido.id_local) !== Number(id_local)) return res.status(403).json({ success: false, message: "No puedes modificar pedidos de otro local." });
         } else if (!esAdministrativo(req)) {
             return res.status(403).json({ success: false, message: "No tienes permisos para modificar pedidos." });
         }
 
         const camposPermitidos = tieneRol(req, ["CLIENTE"]) ? CAMPOS_PEDIDO_CLIENTE : CAMPOS_PEDIDO_ADMIN;
         const campos = [], valores = [];
-
         let seSolicitaEnPreparacion = false;
-        let idEstadoEnPreparacion = null;
 
+        // DETECTAR EN_PREPARACION
         if (req.body.id_estado !== undefined && req.body.id_estado !== null) {
-            idEstadoEnPreparacion = await obtenerIdEstadoPorNombre("EN_PREPARACION");
-
-            if (!idEstadoEnPreparacion) {
-                return res.status(500).json({
-                    success: false,
-                    message: 'No existe el estado "EN_PREPARACION" en la tabla estados.'
-                });
-            }
-
+            const idEstadoEnPreparacion = await obtenerIdEstadoPorNombre("EN_PREPARACION");
+            if (!idEstadoEnPreparacion) return res.status(500).json({ success: false, message: 'No existe el estado "EN_PREPARACION" en la tabla estados.' });
             seSolicitaEnPreparacion = Number(req.body.id_estado) === Number(idEstadoEnPreparacion);
         }
 
         if (tieneRol(req, ["LOCAL"]) && req.body.id_repartidor !== undefined) {
-            return res.status(403).json({
-                success: false,
-                message: "El local no puede asignar manualmente un repartidor."
-            });
+            return res.status(403).json({ success: false, message: "El local no puede asignar manualmente un repartidor." });
         }
 
         for (const campo of camposPermitidos) {
@@ -787,28 +762,16 @@ export const putPedido = async (req, res) => {
             }
         }
 
-        if (!campos.length) {
-            return res.status(400).json({
-                success: false,
-                message: "No se proporcionaron campos válidos para actualizar."
-            });
-        }
+        if (!campos.length) return res.status(400).json({ success: false, message: "No se proporcionaron campos válidos para actualizar." });
 
         valores.push(id);
-
-        const [result] = await conmysql.query(
-            `UPDATE pedidos SET ${campos.join(", ")} WHERE id_pedido = ?`,
-            valores
-        );
-
+        const [result] = await conmysql.query(`UPDATE pedidos SET ${campos.join(", ")} WHERE id_pedido = ?`, valores);
         if (!result.affectedRows) return res.status(404).json({ success: false, message: "Pedido no encontrado" });
 
+        // ASIGNACIÓN AUTOMÁTICA
         let asignacion = null;
-
-        // EN_PREPARACION dispara la asignación automática.
         if (seSolicitaEnPreparacion) {
             console.log("[Pedidos] Pedido EN_PREPARACION. Iniciando asignación automática:", { id_pedido: Number(id) });
-
             try {
                 asignacion = await asignarRepartidorAutomaticamente(Number(id));
                 console.log("[Pedidos] Resultado asignación:", asignacion);
@@ -822,12 +785,7 @@ export const putPedido = async (req, res) => {
         }
 
         const pedidoActualizado = await obtenerPedidoPorIdInterno(id);
-
-        return res.json({
-            success: true,
-            ...ocultarPedidoPin(pedidoActualizado, req),
-            asignacion
-        });
+        return res.json({ success: true, ...ocultarPedidoPin(pedidoActualizado, req), asignacion });
     } catch (error) {
         console.error("[Pedidos] Error putPedido:", error);
         return res.status(500).json({ success: false, message: "Error al actualizar pedido" });
@@ -836,17 +794,13 @@ export const putPedido = async (req, res) => {
 
 export const patchPedido = async (req, res) => putPedido(req, res);
 
-// ============================================================
 // ELIMINAR PEDIDO
-// ============================================================
-
 export const deletePedido = async (req, res) => {
     const conexion = await conmysql.getConnection();
     let transaccionIniciada = false;
 
     try {
         const { id } = req.params;
-
         if (!esIdValido(id)) {
             conexion.release();
             return res.status(400).json({ success: false, message: "El ID del pedido no es válido." });
@@ -863,7 +817,6 @@ export const deletePedido = async (req, res) => {
         }
 
         const pedido = await obtenerPedidoPorIdInterno(id);
-
         if (!pedido) {
             conexion.release();
             return res.status(404).json({ success: false, message: "Pedido no encontrado" });
@@ -885,7 +838,6 @@ export const deletePedido = async (req, res) => {
 
         await conexion.commit();
         transaccionIniciada = false;
-
         return res.status(204).send();
     } catch (error) {
         if (transaccionIniciada) {
@@ -903,10 +855,7 @@ export const deletePedido = async (req, res) => {
     }
 };
 
-// ============================================================
 // EXPORTS
-// ============================================================
-
 export {
     obtenerRol,
     obtenerRoles,
