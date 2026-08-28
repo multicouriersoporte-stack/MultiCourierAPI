@@ -9,6 +9,7 @@ import trazabilidadRoutes from "./routes/trazabilidad.routes.js";
 import mapapedidosRoutes from "./routes/mapapedidos.routes.js";
 
 import authRoutes from "./routes/auth.routes.js";
+import authlocalRoutes from "./routes/authlocal.routes.js";
 import estadosRoutes from "./routes/estados.routes.js";
 import repartidoresRoutes from "./routes/repartidores.routes.js";
 import repartidorubicacionRoutes from "./routes/repartidorubicacion.routes.js";
@@ -54,6 +55,7 @@ app.use(cors(corsOptions));
 
 // RUTAS
 app.use("/api/auth", authRoutes);
+app.use("/api/authlocal", authlocalRoutes);
 
 app.use("/api", rutasRoutes);
 app.use("/api", trazabilidadRoutes);
