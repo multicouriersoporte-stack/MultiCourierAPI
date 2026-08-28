@@ -6,12 +6,12 @@ import { config } from "dotenv";
 
 config();
 
-// POST: LOGIN
+// POST: LOGIN LOCAL
 export const login = async (req, res) => {
     try {
         const { usuario_email, usuario_password } = req.body;
 
-        // Validar credenciales
+        // Validar datos
         if (!usuario_email || !usuario_password) {
             return res.status(400).json({ success: false, message: "El correo y la contraseña son obligatorios." });
         }
@@ -31,12 +31,11 @@ export const login = async (req, res) => {
 
         const usuario = usuarios[0];
 
-        // Verificar estado
+        // Verificar estado y contraseña
         if (Number(usuario.id_estado) !== 1) {
             return res.status(403).json({ success: false, message: "Tu cuenta no está activa." });
         }
 
-        // Verificar contraseña
         if (!await bcrypt.compare(password, String(usuario.usuario_password))) {
             return res.status(401).json({ success: false, message: "El correo o la contraseña son incorrectos." });
         }
@@ -55,70 +54,65 @@ export const login = async (req, res) => {
             return res.status(403).json({ success: false, message: "El usuario no tiene un rol activo asignado." });
         }
 
-        const roles = rolesResult.map(rol => String(rol.rol_nombre).trim().toUpperCase());
-        const prioridades = ["SOPORTE", "SUPERVISOR", "CENTRAL", "LOCAL", "REPARTIDOR", "CLIENTE"];
-
-        // El rol 3 siempre se considera LOCAL
+        // Solo permitir rol LOCAL (id_rol = 3)
         const rolLocal = rolesResult.find(rol => Number(rol.id_rol) === 3);
-        const rolPrincipal = rolLocal ? "LOCAL" : prioridades.find(rol => roles.includes(rol));
 
-        if (!rolPrincipal) {
-            return res.status(403).json({ success: false, message: "El usuario no tiene un rol autorizado para esta aplicación." });
+        if (!rolLocal) {
+            return res.status(403).json({ success: false, message: "Este acceso es exclusivo para usuarios LOCAL." });
         }
 
-        // Obtener datos del rol principal
-        const rolPrincipalData = rolesResult.find(rol =>
-            rolPrincipal === "LOCAL"
-                ? Number(rol.id_rol) === 3
-                : String(rol.rol_nombre).trim().toUpperCase() === rolPrincipal
-        );
+        // Normalizar roles
+        const roles = rolesResult.map(rol => ({
+            id_rol: Number(rol.id_rol),
+            rol_nombre: Number(rol.id_rol) === 3 ? "LOCAL" : String(rol.rol_nombre).trim().toUpperCase(),
+            rol_descripcion: rol.rol_descripcion
+        }));
 
-        // Preparar respuesta pública
+        // Preparar usuario público
         const usuarioRespuesta = {
             ...usuario,
-            id_rol: rolPrincipalData?.id_rol ?? null,
-            usuario_rol: rolPrincipal,
-            roles: rolesResult.map(rol => ({
-                id_rol: rol.id_rol,
-                rol_nombre: Number(rol.id_rol) === 3 ? "LOCAL" : String(rol.rol_nombre).trim().toUpperCase(),
-                rol_descripcion: rol.rol_descripcion
-            }))
+            id_rol: 3,
+            usuario_rol: "LOCAL",
+            roles
         };
 
-        // Nunca enviar la contraseña
         delete usuarioRespuesta.usuario_password;
 
-        // Validar JWT_SECRET
+        // Validar configuración JWT
         if (!process.env.JWT_SECRET) {
             console.error("JWT_SECRET no está configurado.");
             return res.status(500).json({ success: false, message: "Error de configuración del servidor." });
         }
 
-        // Datos incluidos en el token
+        // Datos del token
         const usuarioToken = {
             id_usuario: usuarioRespuesta.id_usuario,
             usuario_codigo: usuarioRespuesta.usuario_codigo,
             usuario_nombre: usuarioRespuesta.usuario_nombre,
             usuario_apellido: usuarioRespuesta.usuario_apellido,
             usuario_email: usuarioRespuesta.usuario_email,
-            id_rol: usuarioRespuesta.id_rol,
-            usuario_rol: usuarioRespuesta.usuario_rol,
-            roles: usuarioRespuesta.roles.map(rol => rol.rol_nombre)
+            id_rol: 3,
+            usuario_rol: "LOCAL",
+            roles: roles.map(rol => rol.rol_nombre)
         };
 
         // Generar JWT
         const token = jwt.sign({ usuario: usuarioToken }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
-        console.log(`✅ Login: ${usuario.usuario_email} | Rol: ${rolPrincipal}`);
+        console.log(`✅ Login LOCAL: ${usuario.usuario_email} | id_rol: 3`);
 
         return res.status(200).json({
             success: true,
-            message: "Inicio de sesión exitoso.",
+            message: "Inicio de sesión LOCAL exitoso.",
             usuario: usuarioRespuesta,
             token
         });
     } catch (error) {
-        console.error("❌ Error login:", error);
-        return res.status(500).json({ success: false, message: "Error interno del servidor.", error: error.message });
+        console.error("❌ Error login LOCAL:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error interno del servidor.",
+            error: error.message
+        });
     }
 };
