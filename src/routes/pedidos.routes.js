@@ -34,8 +34,8 @@ router.get("/pedidos/admin", verificarToken, permitirRoles("CENTRAL", "SUPERVISO
 router.post("/pedidos", verificarToken, permitirRoles("CLIENTE", "CENTRAL", "SUPERVISOR", "SOPORTE"), postPedido);
 
 // Actualizar.
-router.put("/pedidos/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), putPedido);
-router.patch("/pedidos/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), patchPedido);
+router.put("/pedidos/:id", verificarToken, permitirRoles("LOCAL", "CENTRAL", "SUPERVISOR", "SOPORTE"), putPedido);
+router.patch("/pedidos/:id", verificarToken, permitirRoles("LOCAL", "CENTRAL", "SUPERVISOR", "SOPORTE"), patchPedido);
 
 // Eliminar.
 router.delete("/pedidos/:id", verificarToken, permitirRoles("SUPERVISOR", "SOPORTE"), deletePedido);
