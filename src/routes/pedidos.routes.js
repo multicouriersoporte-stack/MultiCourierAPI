@@ -120,6 +120,18 @@ router.get(
     getPedidosPorLocal
 );
 
+router.get(
+    "/pedidos/local",
+    verificarToken,
+    permitirRoles(
+        "LOCAL",
+        "CENTRAL",
+        "SUPERVISOR",
+        "SOPORTE"
+    ),
+    getPedidosPorLocal
+);
+
 // =====================================================
 // PEDIDO POR ID
 // IMPORTANTE: después de las rutas estáticas
