@@ -1,38 +1,38 @@
 // src/routes/pedidos.routes.js
 import express from "express";
 import {
-    getPedidos, getPedidoPorId, getPedidosPorCliente, getPedidosPorLocal,
-    getPedidoPorCodigo, getPedidosPorEstado, postPedido, putPedido,
-    patchPedido, deletePedido
+  getPedidos, getPedidoPorId, getPedidosPorCliente, getPedidosPorLocal,
+  getPedidoPorCodigo, getPedidosPorEstado, postPedido, putPedido,
+  patchPedido, deletePedido
 } from "../controladores/pedidosCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
 
 const router = express.Router();
 
-// Consultas
-router.get("/pedidos/admin", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"), getPedidos);
-router.get("/pedidos", verificarToken, permitirRoles("CLIENTE", "LOCAL", "CENTRAL", "SUPERVISOR", "SOPORTE", "REPARTIDOR"), getPedidos);
-router.get("/pedidos/codigo/:codigo", verificarToken, permitirRoles("CLIENTE", "LOCAL", "CENTRAL", "SUPERVISOR", "SOPORTE", "REPARTIDOR"), getPedidoPorCodigo);
-router.get("/pedidos/estado/:id_estado", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getPedidosPorEstado);
-router.get("/pedidos/cliente/:id_cliente", verificarToken, permitirRoles("CLIENTE", "CENTRAL", "SUPERVISOR", "SOPORTE"), getPedidosPorCliente);
-router.get("/clientes/:id_cliente/pedidos", verificarToken, permitirRoles("CLIENTE", "CENTRAL", "SUPERVISOR", "SOPORTE"), getPedidosPorCliente);
+// GET: consultas según rol. Administrativos pueden consultar todos.
+const ROLES_GET = ["CLIENTE", "LOCAL", "REPARTIDOR", "CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"];
+const ROLES_ADMIN = ["CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"];
 
-// Pedidos por local
-router.get("/pedidos/local/:id_local", verificarToken, permitirRoles("LOCAL", "CENTRAL", "SUPERVISOR", "SOPORTE"), getPedidosPorLocal);
-router.get("/pedidos/local", verificarToken, permitirRoles("LOCAL", "CENTRAL", "SUPERVISOR", "SOPORTE"), getPedidosPorLocal);
+router.get("/pedidos", verificarToken, permitirRoles(...ROLES_GET), getPedidos);
+router.get("/pedidos/admin", verificarToken, permitirRoles(...ROLES_ADMIN), getPedidos);
+router.get("/pedidos/codigo/:codigo", verificarToken, permitirRoles(...ROLES_GET), getPedidoPorCodigo);
+router.get("/pedidos/estado/:id_estado", verificarToken, permitirRoles(...ROLES_GET), getPedidosPorEstado);
+router.get("/pedidos/cliente/:id_cliente", verificarToken, permitirRoles(...ROLES_ADMIN), getPedidosPorCliente);
+router.get("/clientes/:id_cliente/pedidos", verificarToken, permitirRoles(...ROLES_ADMIN), getPedidosPorCliente);
+router.get("/pedidos/local/:id_local", verificarToken, permitirRoles("LOCAL", ...ROLES_ADMIN), getPedidosPorLocal);
+router.get("/pedidos/:id", verificarToken, permitirRoles(...ROLES_GET), getPedidoPorId);
 
-// Pedido por ID: después de las rutas estáticas
-router.get("/pedidos/:id", verificarToken, permitirRoles("CLIENTE", "LOCAL", "CENTRAL", "SUPERVISOR", "SOPORTE", "REPARTIDOR"), getPedidoPorId);
+// POST: únicamente CLIENTE puede crear pedidos.
+router.post("/pedidos", verificarToken, permitirRoles("CLIENTE"), postPedido);
 
-// Crear
-router.post("/pedidos", verificarToken, permitirRoles("CLIENTE", "CENTRAL", "SUPERVISOR", "SOPORTE"), postPedido);
+// PUT/PATCH: CLIENTE, LOCAL, REPARTIDOR, SOPORTE y ADMINISTRADOR.
+// Las transiciones y campos permitidos se validan en pedidosCtrl.js.
+const ROLES_MODIFICAR = ["CLIENTE", "LOCAL", "REPARTIDOR", "SOPORTE", "ADMINISTRADOR"];
+router.put("/pedidos/:id", verificarToken, permitirRoles(...ROLES_MODIFICAR), putPedido);
+router.patch("/pedidos/:id", verificarToken, permitirRoles(...ROLES_MODIFICAR), patchPedido);
 
-// Actualizar
-router.put("/pedidos/:id", verificarToken, permitirRoles("LOCAL", "CENTRAL", "SUPERVISOR", "SOPORTE"), putPedido);
-router.patch("/pedidos/:id", verificarToken, permitirRoles("LOCAL", "CENTRAL", "SUPERVISOR", "SOPORTE"), patchPedido);
-
-// Eliminar
-router.delete("/pedidos/:id", verificarToken, permitirRoles("SUPERVISOR", "SOPORTE"), deletePedido);
+// DELETE: únicamente SOPORTE y ADMINISTRADOR.
+router.delete("/pedidos/:id", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), deletePedido);
 
 export default router;
