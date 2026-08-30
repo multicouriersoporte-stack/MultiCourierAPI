@@ -1034,7 +1034,7 @@ export const putPedido = async (req, res) => {
     let pagoLocal = null;
     let asignacion = null;
 
-    // PENDIENTE -> EN_PREPARACION:
+    // EN_CAMINO-> ENTREGADO:
     // asignar automáticamente un repartidor.
     if (transicionAEnPreparacion) {
       console.log("[Pedidos] Pedido EN_PREPARACION. Asignando repartidor:", {
