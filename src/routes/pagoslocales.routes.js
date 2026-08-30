@@ -1,5 +1,4 @@
 import { Router } from "express";
-
 import {
     getPagosLocales,
     getPagosLocalesxid,
@@ -13,40 +12,14 @@ import {
 
 const router = Router();
 
-
-// =====================================================
 // PAGOS LOCALES
-// =====================================================
-
-// Obtener todos
-router.get("/pagoslocales", getPagosLocales);
-
-// Obtener por ID
-router.get("/pagoslocales/:id", getPagosLocalesxid);
-
-// Obtener pagos de un local
-router.get(
-    "/pagoslocales/local/:id_local",
-    getPagosLocalesPorLocal
-);
-
-// Obtener pagos de un pedido
-router.get(
-    "/pagoslocales/pedido/:id_pedido",
-    getPagosLocalesPorPedido
-);
-
-// Crear pago local
-router.post("/pagoslocales", postPagosLocales);
-
-// Actualizar pago completo
-router.put("/pagoslocales/:id", putPagosLocales);
-
-// Actualizar parcialmente
-router.patch("/pagoslocales/:id", patchPagosLocales);
-
-// Eliminar
-router.delete("/pagoslocales/:id", deletePagosLocales);
-
+router.get("/pagoslocales", getPagosLocales); // Obtener todos
+router.get("/pagoslocales/:id", getPagosLocalesxid); // Obtener por ID
+router.get("/pagoslocales/local/:id_local", getPagosLocalesPorLocal); // Obtener por local
+router.get("/pagoslocales/pedido/:id_pedido", getPagosLocalesPorPedido); // Obtener por pedido
+router.post("/pagoslocales", postPagosLocales); // Crear
+router.put("/pagoslocales/:id", putPagosLocales); // Actualizar completo
+router.patch("/pagoslocales/:id", patchPagosLocales); // Actualizar parcial
+router.delete("/pagoslocales/:id", deletePagosLocales); // Eliminar
 
 export default router;
