@@ -21,7 +21,7 @@ router.post("/locales", postLocales);
 router.put("/locales/:id", putLocales);
 router.patch("/locales/:id", patchLocales);
 
-router.patch("/locales/:id/estado", cambiarEstadoLocal);
+router.patch("/locales/:id/estado", patchEstadoLocal);
 
 router.delete("/locales/:id", deleteLocales);
 
