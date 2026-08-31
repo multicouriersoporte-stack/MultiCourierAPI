@@ -3,7 +3,7 @@
 import { Router } from "express";
 import {
     getLocales, getLocalxid, getLocalPorUsuario, getLocalPorCodigo, getLocalPorRuc,
-    buscarLocales, postLocales, putLocales, patchLocales, deleteLocales, cambiarEstadoLocal
+    buscarLocales, postLocales, putLocales, patchLocales, deleteLocales, patchEstadoLocal
 } from "../controladores/localesCtrl.js";
 
 const router = Router();
