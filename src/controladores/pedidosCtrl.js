@@ -1036,7 +1036,7 @@ export const putPedido = async (req, res) => {
 
     // EN_CAMINO-> ENTREGADO:
     // asignar automáticamente un repartidor.
-    if (transicionAEnPreparacion) {
+    if (transicionAEntregado) {
       console.log("[Pedidos] Pedido EN_PREPARACION. Asignando repartidor:", {
         id_pedido: Number(id)
       });
