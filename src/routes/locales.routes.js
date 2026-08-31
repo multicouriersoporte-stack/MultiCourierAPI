@@ -3,7 +3,7 @@
 import { Router } from "express";
 import {
     getLocales, getLocalxid, getLocalPorUsuario, getLocalPorCodigo, getLocalPorRuc,
-    buscarLocales, postLocales, putLocales, patchLocales, deleteLocales, patchEstadoLocal
+    buscarLocales, postLocales, putLocales, patchLocales, deleteLocales, cambiarEstadoLocal
 } from "../controladores/localesCtrl.js";
 
 const router = Router();
@@ -21,7 +21,7 @@ router.post("/locales", postLocales);
 router.put("/locales/:id", putLocales);
 router.patch("/locales/:id", patchLocales);
 
-router.patch("/locales/:id/estado", patchEstadoLocal);
+router.patch("/locales/:id/estado", cambiarEstadoLocal);
 
 router.delete("/locales/:id", deleteLocales);
 
