@@ -187,7 +187,7 @@ export const patchLocales = async (req, res) => {
 };
 
 // PATCH: Cambiar únicamente el estado de un local
-export const patchEstadoLocal = async (req, res) => {
+export const cambiarEstadoLocal = async (req, res) => {
     try {
         const { id } = req.params, { id_estado } = req.body;
 
@@ -195,19 +195,18 @@ export const patchEstadoLocal = async (req, res) => {
         if (id_estado === undefined || id_estado === null) return res.status(400).json({ message: "Debe proporcionar id_estado" });
         const estado = Number(id_estado);
 
-        // 1 = abierto, 0 = cerrado
-        if (![0, 1].includes(estado)) return res.status(400).json({ message: "El estado debe ser 1 (ABIERTO) o 0 (CERRADO)" });
+        // 4 = abierto, 5 = cerrado
+        if (![4, 5].includes(estado)) return res.status(400).json({ message: "El estado del local debe ser 4 (ABIERTO) o 5 (CERRADO)" });
 
         // Actualizar únicamente el estado
         const [result] = await conmysql.query("UPDATE locales SET id_estado = ? WHERE id_local = ?", [estado, id]);
-
         if (result.affectedRows === 0) return res.status(404).json({ message: "Local no encontrado" });
 
         // Devolver el local actualizado
         const [rows] = await conmysql.query("SELECT * FROM locales WHERE id_local = ?", [id]);
-        return res.json({ message: estado === 1 ? "Local abierto correctamente" : "Local cerrado correctamente", local: rows[0] });
+        return res.json({ message: estado === 4 ? "Local abierto correctamente" : "Local cerrado correctamente", local: rows[0] });
     } catch (error) {
-        console.error("Error patchEstadoLocal:", error);
+        console.error("Error cambiarEstadoLocal:", error);
         return res.status(500).json({ message: "Error al cambiar el estado del local", error: error.message });
     }
 };
