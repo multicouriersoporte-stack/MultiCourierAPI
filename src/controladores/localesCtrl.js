@@ -198,8 +198,8 @@ export const cambiarEstadoLocal = async (req, res) => {
         const estado = Number(id_estado);
 
         // 4 = ABIERTO, 5 = CERRADO
-        if (![4, 5].includes(estado))
-            return res.status(400).json({ message: "El estado del local debe ser 4 (ABIERTO) o 5 (CERRADO)" });
+        if (![1, 0].includes(estado))
+            return res.status(400).json({ message: "El estado del local debe ser 1 (ABIERTO) o 0 (CERRADO)" });
 
         // Actualizar solo el estado del local
         const [result] = await conmysql.query(
@@ -214,7 +214,7 @@ export const cambiarEstadoLocal = async (req, res) => {
         const [rows] = await conmysql.query("SELECT * FROM locales WHERE id_local = ?", [id]);
 
         return res.json({
-            message: estado === 4 ? "Local abierto correctamente" : "Local cerrado correctamente",
+            message: estado === 1 ? "Local abierto correctamente" : "Local cerrado correctamente",
             local: rows[0]
         });
     } catch (error) {
