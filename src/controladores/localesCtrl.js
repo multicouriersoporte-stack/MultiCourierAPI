@@ -186,35 +186,29 @@ export const patchLocales = async (req, res) => {
     }
 };
 
-// PATCH: Actualización parcial de local
-export const patchLocales = async (req, res) => {
+// PATCH: Cambiar únicamente el estado de un local
+export const patchEstadoLocal = async (req, res) => {
     try {
-        const { id } = req.params;
-        const camposPermitidos = ["id_usuario", "local_codigo", "local_nombre_comercial", "local_razon_social", "local_ruc", "local_descripcion", "local_foto", "local_telefono", "local_email", "local_categoria", "local_filtro", "id_provincia", "id_canton", "local_direccion", "local_referencia", "local_latitud", "local_longitud", "local_calificacion", "local_comision_porcentaje", "local_tiempo_preparacion_promedio", "local_hora_apertura", "local_hora_cierre", "local_fecha_registro", "id_estado"];
-        const campos = [], valores = [];
+        const { id } = req.params, { id_estado } = req.body;
 
-        // Tomar únicamente los campos enviados en la petición
-        for (const campo of camposPermitidos) {
-            if (req.body[campo] !== undefined) {
-                campos.push(`${campo} = ?`);
-                valores.push(req.body[campo]);
-            }
-        }
+        // Validar y convertir el estado
+        if (id_estado === undefined || id_estado === null) return res.status(400).json({ message: "Debe proporcionar id_estado" });
+        const estado = Number(id_estado);
 
-        if (campos.length === 0) return res.status(400).json({ message: "No se proporcionaron campos para actualizar" });
+        // 1 = abierto, 0 = cerrado
+        if (![0, 1].includes(estado)) return res.status(400).json({ message: "El estado debe ser 1 (ABIERTO) o 0 (CERRADO)" });
 
-        // Agregar el ID para identificar el local
-        valores.push(id);
-        const [result] = await conmysql.query(`UPDATE locales SET ${campos.join(", ")} WHERE id_local = ?`, valores);
+        // Actualizar únicamente el estado
+        const [result] = await conmysql.query("UPDATE locales SET id_estado = ? WHERE id_local = ?", [estado, id]);
 
         if (result.affectedRows === 0) return res.status(404).json({ message: "Local no encontrado" });
 
         // Devolver el local actualizado
         const [rows] = await conmysql.query("SELECT * FROM locales WHERE id_local = ?", [id]);
-        return res.json({ message: "Local actualizado correctamente", local: rows[0] });
+        return res.json({ message: estado === 1 ? "Local abierto correctamente" : "Local cerrado correctamente", local: rows[0] });
     } catch (error) {
-        console.error("Error patchLocales:", error);
-        return res.status(500).json({ message: "Error al actualizar local", error: error.message });
+        console.error("Error patchEstadoLocal:", error);
+        return res.status(500).json({ message: "Error al cambiar el estado del local", error: error.message });
     }
 };
 
