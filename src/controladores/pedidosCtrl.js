@@ -1127,7 +1127,6 @@ export const putPedido = async (req, res) => {
     } */
 
     // Generar pagos cuando el pedido pasa a ENTREGADO.
-let pagoLocal = null;
 let pagoRepartidor = null;
 
 if (transicionAEntregado) {
