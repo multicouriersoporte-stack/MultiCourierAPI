@@ -973,7 +973,7 @@ export const putPedido = async (req, res) => {
       return res.status(403).json({ success: false, message: "CENTRAL y SUPERVISOR no tienen permisos para modificar pedidos." });
     }
 
-    if (tieneRol(req, ["REPARTIDOR"])) {
+/*     if (tieneRol(req, ["REPARTIDOR"])) {
       const id_repartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
 
       if (Number(pedido.id_repartidor) !== Number(id_repartidor)) {
@@ -984,7 +984,29 @@ export const putPedido = async (req, res) => {
       if (camposNoPermitidos.length) {
         return res.status(403).json({ success: false, message: "El repartidor solo puede modificar el estado del pedido." });
       }
+    } */
+
+    if (tieneRol(req, ["REPARTIDOR"])) {
+  const id_repartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
+
+    if (Number(pedido.id_repartidor) !== Number(id_repartidor)) {
+      return res.status(403).json({
+        success: false,
+        message: "No puedes modificar este pedido."
+      });
     }
+  
+    const camposNoPermitidos = Object.keys(req.body).filter(
+      campo => !["id_estado", "pedido_pin"].includes(campo)
+    );
+  
+    if (camposNoPermitidos.length) {
+      return res.status(403).json({
+        success: false,
+        message: "El repartidor solo puede modificar el estado y el PIN de entrega."
+      });
+    }
+  }
 
     if (tieneRol(req, ["CLIENTE"])) {
       if (!(await verificarAccesoCliente(req, res, pedido.id_cliente))) return;
@@ -1052,6 +1074,34 @@ export const putPedido = async (req, res) => {
         !validacionEstado.mismoEstado &&
         validacionEstado.estadoActual === "EN_CAMINO" &&
         validacionEstado.nuevoEstado === "ENTREGADO";
+
+      // VALIDAR PIN PARA ENTREGAR
+if (transicionAEntregado && tieneRol(req, ["REPARTIDOR"])) {
+  const pedidoPinRecibido = String(req.body.pedido_pin ?? "").trim();
+  const pedidoPinReal = String(pedido.pedido_pin ?? "").trim();
+
+  if (!pedidoPinRecibido) {
+    return res.status(400).json({
+      success: false,
+      message: "El PIN de entrega es obligatorio para marcar el pedido como ENTREGADO."
+    });
+  }
+
+  if (!/^\d{4}$/.test(pedidoPinRecibido)) {
+    return res.status(400).json({
+      success: false,
+      message: "El PIN de entrega debe contener exactamente 4 dígitos."
+    });
+  }
+
+  if (pedidoPinRecibido !== pedidoPinReal) {
+    return res.status(403).json({
+      success: false,
+      message: "PIN de entrega incorrecto. El pedido no puede ser marcado como ENTREGADO."
+    });
+  }
+}
+
     }
 
     const campos = [], valores = [];
