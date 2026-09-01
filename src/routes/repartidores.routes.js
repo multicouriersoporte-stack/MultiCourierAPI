@@ -26,121 +26,42 @@ export default router;
  */
 
 import express from "express";
-
 import {
     getRepartidores,
     getRepartidorxid,
     getRepartidorPorUsuario,
     getRepartidorPorCodigo,
-    //getRepartidoresDisponibles,
-    //getSiguienteRepartidor,
+    // getRepartidoresDisponibles,
+    // getSiguienteRepartidor,
     postRepartidores,
     cambiarEstadoRepartidor,
     putRepartidores,
     patchRepartidores,
     deleteRepartidores
 } from "../controladores/repartidoresCtrl.js";
-
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
 
 const router = express.Router();
 
-// ---------------------------------------------------------
 // CONSULTAS
-// ---------------------------------------------------------
+router.get("/repartidores", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidores);
+router.get("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorxid);
+router.get("/repartidores/usuario/:id_usuario", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorPorUsuario);
+router.get("/repartidores/codigo/:codigo", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorPorCodigo);
 
-router.get(
-    "/repartidores",
-    verificarToken,
-    permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"),
-    getRepartidores
-);
-
-/* router.get(
-    "/repartidores/disponibles",
-    verificarToken,
-    permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"),
-    getRepartidoresDisponibles
-);
- */
-/* router.get(
-    "/repartidores/siguiente",
-    verificarToken,
-    permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"),
-    getSiguienteRepartidor
-);
- */
-router.get(
-    "/repartidores/:id",
-    verificarToken,
-    permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"),
-    getRepartidorxid
-);
-
-router.get(
-    "/repartidores/usuario/:id_usuario",
-    verificarToken,
-    permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"),
-    getRepartidorPorUsuario
-);
-
-router.get(
-    "/repartidores/codigo/:codigo",
-    verificarToken,
-    permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"),
-    getRepartidorPorCodigo
-);
-
-// ---------------------------------------------------------
 // CREAR
-// ---------------------------------------------------------
+router.post("/repartidores", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), postRepartidores);
 
-router.post(
-    "/repartidores",
-    verificarToken,
-    permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"),
-    postRepartidores
-);
+// CAMBIAR ESTADO
+router.patch("/repartidores/:id/estado", verificarToken, permitirRoles("REPARTIDOR", "CENTRAL", "SUPERVISOR", "SOPORTE"), cambiarEstadoRepartidor);
 
-// ---------------------------------------------------------
-// ESTADO
-// ---------------------------------------------------------
-
-router.patch(
-    "/repartidores/:id/estado",
-    verificarToken,
-    permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"),
-    cambiarEstadoRepartidor
-);
-
-// ---------------------------------------------------------
 // ACTUALIZAR
-// ---------------------------------------------------------
+router.put("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), putRepartidores);
+router.patch("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), patchRepartidores);
 
-router.put(
-    "/repartidores/:id",
-    verificarToken,
-    permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"),
-    putRepartidores
-);
-
-router.patch(
-    "/repartidores/:id",
-    verificarToken,
-    permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"),
-    patchRepartidores
-);
-
-// ---------------------------------------------------------
 // ELIMINAR
-// ---------------------------------------------------------
-
-router.delete(
-    "/repartidores/:id",
-    verificarToken,
-    permitirRoles("SUPERVISOR", "SOPORTE"),
-    deleteRepartidores
-);
+router.delete("/repartidores/:id", verificarToken, permitirRoles("SUPERVISOR", "SOPORTE"), deleteRepartidores);
 
 export default router;
+
