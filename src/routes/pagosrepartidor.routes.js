@@ -1,54 +1,31 @@
 import { Router } from "express";
-
 import {
     getPagosRepartidor,
     getPagoRepartidorxid,
+    getPagosRepartidorPorRepartidor,
+    getPagosRepartidorPorPedido,
     postPagosRepartidor,
     putPagosRepartidor,
-    pathPagosRepartidor,
+    patchPagosRepartidor,
     deletePagosRepartidor
 } from "../controladores/pagosrepartidorCtrl.js";
+import { verificarToken } from "../middlewares/auth.middleware.js";
+import { permitirRoles } from "../middlewares/roles.middleware.js";
 
 const router = Router();
 
-// =====================================================
-// PAGOS REPARTIDOR
-// =====================================================
+// Consultas: REPARTIDOR, ADMINISTRADOR y CENTRAL.
+router.get("/pagosrepartidor", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagosRepartidor);
+router.get("/pagosrepartidor/:id", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagoRepartidorxid);
+router.get("/pagosrepartidor/repartidor/:id_repartidor", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagosRepartidorPorRepartidor);
+router.get("/pagosrepartidor/pedido/:id_pedido", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagosRepartidorPorPedido);
 
-// Obtener todos los pagos
-router.get(
-    "/pagosrepartidor",
-    getPagosRepartidor
-);
+// Crear y administrar pagos: ADMINISTRADOR y CENTRAL.
+router.post("/pagosrepartidor", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), postPagosRepartidor);
+router.put("/pagosrepartidor/:id", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), putPagosRepartidor);
+router.patch("/pagosrepartidor/:id", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), patchPagosRepartidor);
 
-// Obtener pago por ID
-router.get(
-    "/pagosrepartidor/:id",
-    getPagoRepartidorxid
-);
-
-// Crear pago
-router.post(
-    "/pagosrepartidor",
-    postPagosRepartidor
-);
-
-// Actualizar pago completo
-router.put(
-    "/pagosrepartidor/:id",
-    putPagosRepartidor
-);
-
-// Actualizar pago parcialmente
-router.patch(
-    "/pagosrepartidor/:id",
-    pathPagosRepartidor
-);
-
-// Eliminar pago
-router.delete(
-    "/pagosrepartidor/:id",
-    deletePagosRepartidor
-);
+// Eliminar: solamente ADMINISTRADOR.
+router.delete("/pagosrepartidor/:id", verificarToken, permitirRoles("ADMINISTRADOR"), deletePagosRepartidor);
 
 export default router;
