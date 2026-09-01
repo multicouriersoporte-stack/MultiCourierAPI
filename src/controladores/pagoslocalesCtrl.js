@@ -4,7 +4,7 @@ import { conmysql } from "../db.js";
 const PORCENTAJE_COMISION_LOCAL = 5;
 
 /**
- * Crea el pago de un pedido al pasar a EN_PREPARACION.
+ * Crea el pago de un pedido cuando pasa a ENTREGADO (estado 15).
  * Es idempotente: no duplica pagos existentes.
  */
 export const crearPagoLocalDesdePedido = async (id_pedido, conexion = conmysql) => {
@@ -41,6 +41,10 @@ export const crearPagoLocalDesdePedido = async (id_pedido, conexion = conmysql) 
 
     if (!pedido.id_local) {
         throw new Error(`El pedido ${idPedido} no tiene un local asociado.`);
+    }
+
+    if (Number(pedido.id_estado) !== 15) {
+    throw new Error(`El pago local solo puede generarse cuando el pedido está ENTREGADO (estado 15). Estado actual: ${pedido.id_estado}`);
     }
 
     // Calcular subtotal, comisión y total que recibe el local.
