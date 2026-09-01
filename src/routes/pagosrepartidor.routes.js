@@ -16,16 +16,16 @@ const router = Router();
 
 // Consultas: REPARTIDOR, ADMINISTRADOR y CENTRAL.
 router.get("/pagosrepartidor", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagosRepartidor);
-router.get("/pagosrepartidor/:id", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagoRepartidorxid);
 router.get("/pagosrepartidor/repartidor/:id_repartidor", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagosRepartidorPorRepartidor);
 router.get("/pagosrepartidor/pedido/:id_pedido", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagosRepartidorPorPedido);
+router.get("/pagosrepartidor/:id", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagoRepartidorxid);
 
-// Crear y administrar pagos: ADMINISTRADOR y CENTRAL.
+// Administración: ADMINISTRADOR y CENTRAL.
 router.post("/pagosrepartidor", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), postPagosRepartidor);
 router.put("/pagosrepartidor/:id", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), putPagosRepartidor);
 router.patch("/pagosrepartidor/:id", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), patchPagosRepartidor);
 
-// Eliminar: solamente ADMINISTRADOR.
+// Eliminación: únicamente ADMINISTRADOR.
 router.delete("/pagosrepartidor/:id", verificarToken, permitirRoles("ADMINISTRADOR"), deletePagosRepartidor);
 
 export default router;
