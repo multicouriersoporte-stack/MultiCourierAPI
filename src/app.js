@@ -33,6 +33,8 @@ import usuariorolesRoutes from "./routes/usuarioroles.routes.js";
 import provinciasRoutes from "./routes/provincias.routes.js";
 import cantonesRoutes from "./routes/cantones.routes.js";
 
+import { iniciarAsignacionAutomatica } from "./servicios/asignacionAutomatica.js";
+
 config();
 
 const app = express();
@@ -102,5 +104,7 @@ app.use((req, res) => {
         message: "Endpoint not found"
     });
 });
+
+iniciarAsignacionAutomatica();
 
 export default app;
