@@ -508,13 +508,54 @@ export const getPedidoPorId = async (req, res) => {
       return res.json(ocultarPedidoPin(pedido, req));
     }
 
+    /*     if (tieneRol(req, ["REPARTIDOR"])) {
+          const id_repartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
+          if (Number(pedido.id_repartidor) !== Number(id_repartidor)) {
+            return res.status(403).json({ success: false, message: "No puedes acceder a este pedido." });
+          }
+          return res.json(ocultarPedidoPin(pedido, req));
+        } */
+
     if (tieneRol(req, ["REPARTIDOR"])) {
-      const id_repartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
+      const id_repartidor = await obtenerRepartidorDelUsuario(
+        obtenerIdUsuario(req)
+      );
+
       if (Number(pedido.id_repartidor) !== Number(id_repartidor)) {
-        return res.status(403).json({ success: false, message: "No puedes acceder a este pedido." });
+        return res.status(403).json({
+          success: false,
+          message: "No puedes acceder a este pedido."
+        });
       }
+
+      const [detalles] = await conmysql.query(
+        `SELECT
+      pd.*,
+      p.pedido_codigo,
+      lp.id_local,
+      lp.id_producto,
+      l.local_nombre_comercial,
+      pr.producto_codigo,
+      pr.producto_nombre
+    FROM pedido_detalles pd
+    LEFT JOIN pedidos p
+      ON pd.id_pedido = p.id_pedido
+    LEFT JOIN local_productos lp
+      ON pd.id_local_producto = lp.id_local_producto
+    LEFT JOIN locales l
+      ON lp.id_local = l.id_local
+    LEFT JOIN productos pr
+      ON lp.id_producto = pr.id_producto
+    WHERE pd.id_pedido = ?
+    ORDER BY pd.id_pedido_detalle ASC`,
+        [id]
+      );
+
+      pedido.detalles = detalles;
+
       return res.json(ocultarPedidoPin(pedido, req));
     }
+
 
     if (tieneRol(req, ["LOCAL"])) {
       const local = await obtenerLocalDelUsuario(req);
@@ -973,40 +1014,40 @@ export const putPedido = async (req, res) => {
       return res.status(403).json({ success: false, message: "CENTRAL y SUPERVISOR no tienen permisos para modificar pedidos." });
     }
 
-/*     if (tieneRol(req, ["REPARTIDOR"])) {
+    /*     if (tieneRol(req, ["REPARTIDOR"])) {
+          const id_repartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
+    
+          if (Number(pedido.id_repartidor) !== Number(id_repartidor)) {
+            return res.status(403).json({ success: false, message: "No puedes modificar este pedido." });
+          }
+    
+          const camposNoPermitidos = Object.keys(req.body).filter(campo => campo !== "id_estado");
+          if (camposNoPermitidos.length) {
+            return res.status(403).json({ success: false, message: "El repartidor solo puede modificar el estado del pedido." });
+          }
+        } */
+
+    if (tieneRol(req, ["REPARTIDOR"])) {
       const id_repartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
 
       if (Number(pedido.id_repartidor) !== Number(id_repartidor)) {
-        return res.status(403).json({ success: false, message: "No puedes modificar este pedido." });
+        return res.status(403).json({
+          success: false,
+          message: "No puedes modificar este pedido."
+        });
       }
 
-      const camposNoPermitidos = Object.keys(req.body).filter(campo => campo !== "id_estado");
+      const camposNoPermitidos = Object.keys(req.body).filter(
+        campo => !["id_estado", "pedido_pin"].includes(campo)
+      );
+
       if (camposNoPermitidos.length) {
-        return res.status(403).json({ success: false, message: "El repartidor solo puede modificar el estado del pedido." });
+        return res.status(403).json({
+          success: false,
+          message: "El repartidor solo puede modificar el estado y el PIN de entrega."
+        });
       }
-    } */
-
-    if (tieneRol(req, ["REPARTIDOR"])) {
-  const id_repartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
-
-    if (Number(pedido.id_repartidor) !== Number(id_repartidor)) {
-      return res.status(403).json({
-        success: false,
-        message: "No puedes modificar este pedido."
-      });
     }
-  
-    const camposNoPermitidos = Object.keys(req.body).filter(
-      campo => !["id_estado", "pedido_pin"].includes(campo)
-    );
-  
-    if (camposNoPermitidos.length) {
-      return res.status(403).json({
-        success: false,
-        message: "El repartidor solo puede modificar el estado y el PIN de entrega."
-      });
-    }
-  }
 
     if (tieneRol(req, ["CLIENTE"])) {
       if (!(await verificarAccesoCliente(req, res, pedido.id_cliente))) return;
@@ -1076,31 +1117,31 @@ export const putPedido = async (req, res) => {
         validacionEstado.nuevoEstado === "ENTREGADO";
 
       // VALIDAR PIN PARA ENTREGAR
-if (transicionAEntregado && tieneRol(req, ["REPARTIDOR"])) {
-  const pedidoPinRecibido = String(req.body.pedido_pin ?? "").trim();
-  const pedidoPinReal = String(pedido.pedido_pin ?? "").trim();
+      if (transicionAEntregado && tieneRol(req, ["REPARTIDOR"])) {
+        const pedidoPinRecibido = String(req.body.pedido_pin ?? "").trim();
+        const pedidoPinReal = String(pedido.pedido_pin ?? "").trim();
 
-  if (!pedidoPinRecibido) {
-    return res.status(400).json({
-      success: false,
-      message: "El PIN de entrega es obligatorio para marcar el pedido como ENTREGADO."
-    });
-  }
+        if (!pedidoPinRecibido) {
+          return res.status(400).json({
+            success: false,
+            message: "El PIN de entrega es obligatorio para marcar el pedido como ENTREGADO."
+          });
+        }
 
-  if (!/^\d{4}$/.test(pedidoPinRecibido)) {
-    return res.status(400).json({
-      success: false,
-      message: "El PIN de entrega debe contener exactamente 4 dígitos."
-    });
-  }
+        if (!/^\d{4}$/.test(pedidoPinRecibido)) {
+          return res.status(400).json({
+            success: false,
+            message: "El PIN de entrega debe contener exactamente 4 dígitos."
+          });
+        }
 
-  if (pedidoPinRecibido !== pedidoPinReal) {
-    return res.status(403).json({
-      success: false,
-      message: "PIN de entrega incorrecto. El pedido no puede ser marcado como ENTREGADO."
-    });
-  }
-}
+        if (pedidoPinRecibido !== pedidoPinReal) {
+          return res.status(403).json({
+            success: false,
+            message: "PIN de entrega incorrecto. El pedido no puede ser marcado como ENTREGADO."
+          });
+        }
+      }
 
     }
 
@@ -1156,66 +1197,66 @@ if (transicionAEntregado && tieneRol(req, ["REPARTIDOR"])) {
     }
 
     // Generar pago local al entregar
-/*     if (transicionAEntregado) {
-      console.log("[Pedidos] EN_CAMINO -> ENTREGADO. Generando pago local:", {
-        id_pedido: Number(id), id_local: pedido.id_local
+    /*     if (transicionAEntregado) {
+          console.log("[Pedidos] EN_CAMINO -> ENTREGADO. Generando pago local:", {
+            id_pedido: Number(id), id_local: pedido.id_local
+          });
+    
+          try {
+            pagoLocal = await crearPagoLocalDesdePedido(Number(id));
+            console.log("[Pedidos] Pago local procesado:", pagoLocal);
+          } catch (errorPago) {
+            console.error("[Pedidos] Error creando pago local:", errorPago);
+            pagoLocal = {
+              creado: false,
+              existente: false,
+              error: true,
+              motivo: "El pedido quedó ENTREGADO, pero no se pudo generar el pago local.",
+              error_detalle: process.env.NODE_ENV === "development" ? errorPago.message : undefined
+            };
+          }
+        } */
+
+    // Generar pagos cuando el pedido pasa a ENTREGADO.
+    let pagoRepartidor = null;
+
+    if (transicionAEntregado) {
+      console.log("[Pedidos] EN_CAMINO -> ENTREGADO. Generando pagos:", {
+        id_pedido: Number(id),
+        id_local: pedido.id_local,
+        id_repartidor: pedido.id_repartidor
       });
 
+      // Generar pago del local.
       try {
         pagoLocal = await crearPagoLocalDesdePedido(Number(id));
         console.log("[Pedidos] Pago local procesado:", pagoLocal);
-      } catch (errorPago) {
-        console.error("[Pedidos] Error creando pago local:", errorPago);
+      } catch (errorPagoLocal) {
+        console.error("[Pedidos] Error creando pago local:", errorPagoLocal);
         pagoLocal = {
           creado: false,
           existente: false,
           error: true,
           motivo: "El pedido quedó ENTREGADO, pero no se pudo generar el pago local.",
-          error_detalle: process.env.NODE_ENV === "development" ? errorPago.message : undefined
+          error_detalle: process.env.NODE_ENV === "development" ? errorPagoLocal.message : undefined
         };
       }
-    } */
 
-    // Generar pagos cuando el pedido pasa a ENTREGADO.
-let pagoRepartidor = null;
-
-if (transicionAEntregado) {
-    console.log("[Pedidos] EN_CAMINO -> ENTREGADO. Generando pagos:", {
-        id_pedido: Number(id),
-        id_local: pedido.id_local,
-        id_repartidor: pedido.id_repartidor
-    });
-
-    // Generar pago del local.
-    try {
-        pagoLocal = await crearPagoLocalDesdePedido(Number(id));
-        console.log("[Pedidos] Pago local procesado:", pagoLocal);
-    } catch (errorPagoLocal) {
-        console.error("[Pedidos] Error creando pago local:", errorPagoLocal);
-        pagoLocal = {
-            creado: false,
-            existente: false,
-            error: true,
-            motivo: "El pedido quedó ENTREGADO, pero no se pudo generar el pago local.",
-            error_detalle: process.env.NODE_ENV === "development" ? errorPagoLocal.message : undefined
-        };
-    }
-
-    // Generar pago del repartidor.
-    try {
+      // Generar pago del repartidor.
+      try {
         pagoRepartidor = await crearPagoRepartidorDesdePedido(Number(id));
         console.log("[Pedidos] Pago de repartidor procesado:", pagoRepartidor);
-    } catch (errorPagoRepartidor) {
+      } catch (errorPagoRepartidor) {
         console.error("[Pedidos] Error creando pago de repartidor:", errorPagoRepartidor);
         pagoRepartidor = {
-            creado: false,
-            existente: false,
-            error: true,
-            motivo: "El pedido quedó ENTREGADO, pero no se pudo generar el pago del repartidor.",
-            error_detalle: process.env.NODE_ENV === "development" ? errorPagoRepartidor.message : undefined
+          creado: false,
+          existente: false,
+          error: true,
+          motivo: "El pedido quedó ENTREGADO, pero no se pudo generar el pago del repartidor.",
+          error_detalle: process.env.NODE_ENV === "development" ? errorPagoRepartidor.message : undefined
         };
+      }
     }
-  }
 
     const pedidoActualizado = await obtenerPedidoPorIdInterno(id);
 
