@@ -34,6 +34,7 @@ import provinciasRoutes from "./routes/provincias.routes.js";
 import cantonesRoutes from "./routes/cantones.routes.js";
 
 import { iniciarAsignacionAutomatica } from "./servicios/asignacionAutomatica.js";
+import buscarPedidosRoutes from "./routes/buscarPedidos.routes.js";
 
 config();
 
@@ -88,6 +89,8 @@ app.use("/api", rolesRoutes);
 app.use("/api", usuariorolesRoutes);
 app.use("/api", provinciasRoutes);
 app.use("/api", cantonesRoutes);
+
+app.use("/api", buscarPedidosRoutes);
 
 // PRUEBA API
 app.get("/api", (req, res) => {
