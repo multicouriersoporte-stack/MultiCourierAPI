@@ -2,6 +2,7 @@
 import { conmysql } from "../db.js";
 import { asignarRepartidorAutomaticamente } from "./pedidorepartidoresCtrl.js";
 import { crearPagoLocalDesdePedido } from "./pagoslocalesCtrl.js";
+import { crearPagoRepartidorDesdePedido } from "./pagosrepartidorCtrl.js";
 
 // ROLES Y TRANSICIONES
 const ROLES_ADMINISTRATIVOS = ["CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"];
@@ -1105,7 +1106,7 @@ export const putPedido = async (req, res) => {
     }
 
     // Generar pago local al entregar
-    if (transicionAEntregado) {
+/*     if (transicionAEntregado) {
       console.log("[Pedidos] EN_CAMINO -> ENTREGADO. Generando pago local:", {
         id_pedido: Number(id), id_local: pedido.id_local
       });
@@ -1123,7 +1124,49 @@ export const putPedido = async (req, res) => {
           error_detalle: process.env.NODE_ENV === "development" ? errorPago.message : undefined
         };
       }
+    } */
+
+    // Generar pagos cuando el pedido pasa a ENTREGADO.
+let pagoLocal = null;
+let pagoRepartidor = null;
+
+if (transicionAEntregado) {
+    console.log("[Pedidos] EN_CAMINO -> ENTREGADO. Generando pagos:", {
+        id_pedido: Number(id),
+        id_local: pedido.id_local,
+        id_repartidor: pedido.id_repartidor
+    });
+
+    // Generar pago del local.
+    try {
+        pagoLocal = await crearPagoLocalDesdePedido(Number(id));
+        console.log("[Pedidos] Pago local procesado:", pagoLocal);
+    } catch (errorPagoLocal) {
+        console.error("[Pedidos] Error creando pago local:", errorPagoLocal);
+        pagoLocal = {
+            creado: false,
+            existente: false,
+            error: true,
+            motivo: "El pedido quedó ENTREGADO, pero no se pudo generar el pago local.",
+            error_detalle: process.env.NODE_ENV === "development" ? errorPagoLocal.message : undefined
+        };
     }
+
+    // Generar pago del repartidor.
+    try {
+        pagoRepartidor = await crearPagoRepartidorDesdePedido(Number(id));
+        console.log("[Pedidos] Pago de repartidor procesado:", pagoRepartidor);
+    } catch (errorPagoRepartidor) {
+        console.error("[Pedidos] Error creando pago de repartidor:", errorPagoRepartidor);
+        pagoRepartidor = {
+            creado: false,
+            existente: false,
+            error: true,
+            motivo: "El pedido quedó ENTREGADO, pero no se pudo generar el pago del repartidor.",
+            error_detalle: process.env.NODE_ENV === "development" ? errorPagoRepartidor.message : undefined
+        };
+    }
+  }
 
     const pedidoActualizado = await obtenerPedidoPorIdInterno(id);
 
@@ -1131,6 +1174,7 @@ export const putPedido = async (req, res) => {
       success: true,
       ...ocultarPedidoPin(pedidoActualizado, req),
       pago_local: pagoLocal,
+      pago_repartidor: pagoRepartidor,
       asignacion
     });
   } catch (error) {
