@@ -44,7 +44,7 @@ export const crearPagoLocalDesdePedido = async (id_pedido, conexion = conmysql) 
     }
 
     if (Number(pedido.id_estado) !== 15) {
-    throw new Error(`El pago local solo puede generarse cuando el pedido está ENTREGADO (estado 15). Estado actual: ${pedido.id_estado}`);
+        throw new Error(`El pago local solo puede generarse cuando el pedido está ENTREGADO (estado 15). Estado actual: ${pedido.id_estado}`);
     }
 
     // Calcular subtotal, comisión y total que recibe el local.

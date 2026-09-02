@@ -34,7 +34,10 @@ import provinciasRoutes from "./routes/provincias.routes.js";
 import cantonesRoutes from "./routes/cantones.routes.js";
 
 import { iniciarAsignacionAutomatica } from "./servicios/asignacionAutomatica.js";
+<<<<<<< Updated upstream
 import buscarPedidosRoutes from "./routes/buscarPedidos.routes.js";
+=======
+>>>>>>> Stashed changes
 
 config();
 
