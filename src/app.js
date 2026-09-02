@@ -108,6 +108,6 @@ app.use((req, res) => {
     });
 });
 
-iniciarAsignacionAutomatica();
+//iniciarAsignacionAutomatica();
 
 export default app;
