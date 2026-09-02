@@ -1336,6 +1336,78 @@ export const putPedido = async (req, res) => {
 // PATCH usa la misma lógica
 export const patchPedido = async (req, res) => putPedido(req, res);
 
+// ENTREGAR PEDIDO CON PIN
+export const entregarPedidoConPin = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validar solicitud y autenticación
+    if (!esIdValido(id)) return res.status(400).json({ success: false, message: "El ID del pedido no es válido." });
+    if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
+    if (!tieneRol(req, ["REPARTIDOR"])) return res.status(403).json({ success: false, message: "Solo un repartidor puede marcar el pedido como ENTREGADO." });
+
+    const id_usuario = obtenerIdUsuario(req);
+    if (!id_usuario) return res.status(401).json({ success: false, message: "No se pudo identificar al usuario autenticado." });
+
+    // Obtener repartidor y pedido
+    const id_repartidor = await obtenerRepartidorDelUsuario(id_usuario);
+    if (!id_repartidor) return res.status(403).json({ success: false, message: "El usuario no tiene un repartidor asociado." });
+
+    const pedido = await obtenerPedidoPorIdInterno(id);
+    if (!pedido) return res.status(404).json({ success: false, message: "Pedido no encontrado." });
+
+    // Validar asignación y estado
+    if (Number(pedido.id_repartidor) !== Number(id_repartidor)) return res.status(403).json({ success: false, message: "No puedes entregar este pedido porque no está asignado a tu cuenta." });
+
+    const estadoActual = String(pedido.estado_nombre || "").trim().toUpperCase();
+    if (estadoActual !== "EN_CAMINO") return res.status(403).json({ success: false, message: `El pedido está en estado ${estadoActual} y no puede ser entregado.` });
+
+    // Validar PIN
+    const pedidoPinRecibido = String(req.body?.pedido_pin ?? "").trim();
+    const pedidoPinReal = String(pedido.pedido_pin ?? "").trim();
+    if (!pedidoPinRecibido) return res.status(400).json({ success: false, message: "El PIN de entrega es obligatorio." });
+    if (!/^\d{4}$/.test(pedidoPinRecibido)) return res.status(400).json({ success: false, message: "El PIN de entrega debe contener exactamente 4 dígitos." });
+    if (pedidoPinRecibido !== pedidoPinReal) return res.status(403).json({ success: false, message: "PIN de entrega incorrecto." });
+
+    // Obtener estado ENTREGADO
+    const idEstadoEntregado = await obtenerIdEstadoPorNombre("ENTREGADO", "PEDIDO");
+    if (!idEstadoEntregado) return res.status(500).json({ success: false, message: 'No existe el estado "ENTREGADO" para pedidos.' });
+
+    // Actualizar pedido
+    const [result] = await conmysql.query(
+      `UPDATE pedidos SET id_estado = ?, pedido_fecha_entrega = NOW() WHERE id_pedido = ?`,
+      [idEstadoEntregado, id]
+    );
+    if (!result.affectedRows) return res.status(404).json({ success: false, message: "No se pudo actualizar el pedido." });
+
+    // Generar pagos
+    let pagoLocal = null, pagoRepartidor = null;
+    try {
+      pagoLocal = await crearPagoLocalDesdePedido(Number(id));
+      console.log("[Pedidos] Pago local procesado:", pagoLocal);
+    } catch (errorPagoLocal) {
+      console.error("[Pedidos] Error creando pago local:", errorPagoLocal);
+      pagoLocal = { creado: false, existente: false, error: true, motivo: "El pedido quedó ENTREGADO, pero no se pudo generar el pago local.", error_detalle: process.env.NODE_ENV === "development" ? errorPagoLocal.message : undefined };
+    }
+
+    try {
+      pagoRepartidor = await crearPagoRepartidorDesdePedido(Number(id));
+      console.log("[Pedidos] Pago repartidor procesado:", pagoRepartidor);
+    } catch (errorPagoRepartidor) {
+      console.error("[Pedidos] Error creando pago repartidor:", errorPagoRepartidor);
+      pagoRepartidor = { creado: false, existente: false, error: true, motivo: "El pedido quedó ENTREGADO, pero no se pudo generar el pago del repartidor.", error_detalle: process.env.NODE_ENV === "development" ? errorPagoRepartidor.message : undefined };
+    }
+
+    // Obtener pedido actualizado y responder
+    const pedidoActualizado = await obtenerPedidoPorIdInterno(id);
+    return res.json({ success: true, message: "Pedido entregado correctamente.", ...ocultarPedidoPin(pedidoActualizado, req), pago_local: pagoLocal, pago_repartidor: pagoRepartidor });
+  } catch (error) {
+    console.error("[Pedidos] Error entregarPedidoConPin:", error);
+    return res.status(500).json({ success: false, message: "Error al entregar el pedido.", error: process.env.NODE_ENV === "development" ? error.message : undefined });
+  }
+};
+
+
 // ELIMINAR PEDIDO
 export const deletePedido = async (req, res) => {
   const conexion = await conmysql.getConnection();
