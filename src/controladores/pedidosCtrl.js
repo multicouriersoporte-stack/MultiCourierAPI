@@ -123,23 +123,77 @@ const convertirFechaMySQL = fecha => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 };
 
-const obtenerIdEstadoPorNombre = async nombreEstado => {
+/* const obtenerIdEstadoPorNombre = async nombreEstado => {
   const [rows] = await conmysql.query(
     `SELECT id_estado FROM estados WHERE UPPER(TRIM(estado_nombre)) = ? LIMIT 1`,
     [String(nombreEstado).trim().toUpperCase()]
   );
+  return rows.length ? rows[0].id_estado : null;
+}; */
+
+const obtenerIdEstadoPorNombre = async (nombreEstado, tipoEstado = null) => {
+  let sql = `
+    SELECT id_estado
+    FROM estados
+    WHERE UPPER(TRIM(estado_nombre)) = ?
+  `;
+
+  const valores = [
+    String(nombreEstado).trim().toUpperCase()
+  ];
+
+  if (tipoEstado) {
+    sql += `
+      AND UPPER(TRIM(estado_tipo)) = ?
+    `;
+
+    valores.push(
+      String(tipoEstado).trim().toUpperCase()
+    );
+  }
+
+  sql += `
+    AND estado_activo = 1
+    ORDER BY id_estado
+    LIMIT 1
+  `;
+
+  const [rows] = await conmysql.query(sql, valores);
+
   return rows.length ? rows[0].id_estado : null;
 };
 
 // VALIDAR TRANSICIÓN
 const validarTransicionEstado = async (req, pedido, nuevoIdEstado) => {
   const estadoActual = String(pedido.estado_nombre || "").trim().toUpperCase();
-  const [estados] = await conmysql.query(
+/*   const [estados] = await conmysql.query(
     `SELECT id_estado, estado_nombre FROM estados WHERE id_estado = ? LIMIT 1`,
     [nuevoIdEstado]
-  );
+  ); */
+
+  const [estados] = await conmysql.query(
+  `SELECT id_estado, estado_tipo, estado_nombre, estado_activo
+   FROM estados WHERE id_estado = ? LIMIT 1`,
+  [nuevoIdEstado]
+);
 
   if (!estados.length) return { valido: false, status: 400, message: "El estado solicitado no existe." };
+
+  if (String(estados[0].estado_tipo || "").trim().toUpperCase() !== "PEDIDO") {
+  return {
+    valido: false,
+    status: 400,
+    message: "El estado solicitado no pertenece al flujo de estados de pedidos."
+  };
+}
+
+if (Number(estados[0].estado_activo) !== 1) {
+  return {
+    valido: false,
+    status: 400,
+    message: "El estado solicitado está inactivo."
+  };
+}
 
   const nuevoEstado = String(estados[0].estado_nombre || "").trim().toUpperCase();
 
@@ -850,7 +904,9 @@ export const postPedido = async (req, res) => {
     const pedido_codigo = `PED-${String(numero).padStart(5, "0")}`;
     pedido_pin = generarPedidoPin();
 
-    const estadoInicial = await obtenerIdEstadoPorNombre("PENDIENTE");
+    //const estadoInicial = await obtenerIdEstadoPorNombre("PENDIENTE");
+    const estadoInicial = await obtenerIdEstadoPorNombre("PENDIENTE", "PEDIDO");
+
     if (!estadoInicial) throw new Error('No existe el estado "PENDIENTE" en la tabla estados.');
 
     const [result] = await conexion.query(
