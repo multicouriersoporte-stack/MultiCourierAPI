@@ -221,7 +221,7 @@ export const login = async (req, res) => {
             return res.status(403).json({ success: false, message: "El usuario no tiene un rol activo asignado." });
 
         const roles = rolesResult.map(rol => String(rol.rol_nombre).trim().toUpperCase());
-        const prioridades = ["SOPORTE", "SUPERVISOR", "CENTRAL", "REPARTIDOR", "CLIENTE"];
+        const prioridades = ["SOPORTE", "SUPERVISOR", "ADMINISTRADOR", "CENTRAL", "REPARTIDOR", "CLIENTE"];
         const rolPrincipal = prioridades.find(rol => roles.includes(rol));
 
         if (!rolPrincipal)
