@@ -3,7 +3,7 @@ import express from "express";
 import {
   getPedidos, getPedidoPorId, getPedidosPorCliente, getPedidosPorLocal,
   getPedidoPorCodigo, getPedidosPorEstado, postPedido, putPedido,
-  patchPedido, entregarPedidoConPin, deletePedido
+  patchPedido, entregarPedidoConPin, confirmarPagoPedido, deletePedido
 } from "../controladores/pedidosCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
@@ -32,6 +32,7 @@ const ROLES_MODIFICAR = ["CLIENTE", "LOCAL", "REPARTIDOR", "SOPORTE", "ADMINISTR
 router.put("/pedidos/:id", verificarToken, permitirRoles(...ROLES_MODIFICAR), putPedido);
 router.patch("/pedidos/:id", verificarToken, permitirRoles(...ROLES_MODIFICAR), patchPedido);
 router.patch("/pedidos/:id/entregar", verificarToken, permitirRoles("REPARTIDOR"), entregarPedidoConPin);
+router.patch("/pedidos/:id/confirmar-pago", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), confirmarPagoPedido);
 
 // DELETE: únicamente SOPORTE y ADMINISTRADOR.
 router.delete("/pedidos/:id", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), deletePedido);
