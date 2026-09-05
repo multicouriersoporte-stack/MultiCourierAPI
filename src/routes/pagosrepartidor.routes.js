@@ -14,18 +14,18 @@ import { permitirRoles } from "../middlewares/roles.middleware.js";
 
 const router = Router();
 
-// Consultas: REPARTIDOR, ADMINISTRADOR y CENTRAL.
+// Consultas: repartidor, administrador y central.
 router.get("/pagosrepartidor", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagosRepartidor);
 router.get("/pagosrepartidor/repartidor/:id_repartidor", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagosRepartidorPorRepartidor);
 router.get("/pagosrepartidor/pedido/:id_pedido", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagosRepartidorPorPedido);
 router.get("/pagosrepartidor/:id", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagoRepartidorxid);
 
-// Administración: ADMINISTRADOR y CENTRAL.
+// Administración: crear y modificar pagos.
 router.post("/pagosrepartidor", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), postPagosRepartidor);
 router.put("/pagosrepartidor/:id", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), putPagosRepartidor);
 router.patch("/pagosrepartidor/:id", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), patchPagosRepartidor);
 
-// Eliminación: únicamente ADMINISTRADOR.
+// Eliminación: solo administrador.
 router.delete("/pagosrepartidor/:id", verificarToken, permitirRoles("ADMINISTRADOR"), deletePagosRepartidor);
 
 export default router;
