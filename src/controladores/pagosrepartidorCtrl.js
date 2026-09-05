@@ -1,9 +1,7 @@
 import { conmysql } from "../db.js";
 
-// Comisión descontada de la carrera del repartidor.
+// Configuración y utilidades.
 const PORCENTAJE_COMISION_REPARTIDOR = 5;
-
-// Utilidades.
 const esIdValido = id => Number.isInteger(Number(id)) && Number(id) > 0;
 
 const obtenerIdUsuario = req => {
@@ -35,23 +33,22 @@ const tieneRol = (req, rolesPermitidos = []) =>
 const esAdministrativo = req => tieneRol(req, ["ADMINISTRADOR", "CENTRAL"]);
 
 // Obtiene el repartidor asociado al usuario.
-export const obtenerRepartidorDelUsuario = async id_usuario => {
+const obtenerRepartidorDelUsuario = async id_usuario => {
     if (!id_usuario) return null;
     const [rows] = await conmysql.query(
-        `SELECT id_repartidor, id_usuario, repartidor_codigo
-         FROM repartidores WHERE id_usuario = ? LIMIT 1`,
+        `SELECT id_repartidor, id_usuario, repartidor_codigo FROM repartidores WHERE id_usuario = ? LIMIT 1`,
         [id_usuario]
     );
     return rows.length ? rows[0] : null;
 };
 
-// Obtiene un pago con la información relacionada.
-export const obtenerPagoPorIdInterno = async id_pago_repartidor => {
+// Obtiene un pago con sus datos relacionados.
+const obtenerPagoPorIdInterno = async id_pago_repartidor => {
     const [rows] = await conmysql.query(
-        `SELECT pr.*, r.repartidor_codigo, r.id_usuario AS repartidor_id_usuario,
-                r.repartidor_placa, r.repartidor_tipo_vehiculo, r.repartidor_calificacion,
-                p.pedido_codigo, p.id_cliente, p.id_local, p.pedido_carrera,
-                p.pedido_propina, p.pedido_total, e.estado_nombre AS pedido_estado_nombre
+        `SELECT pr.*, r.repartidor_codigo, r.id_usuario AS repartidor_id_usuario, r.repartidor_placa,
+                r.repartidor_tipo_vehiculo, r.repartidor_calificacion, p.pedido_codigo, p.id_cliente,
+                p.id_local, p.pedido_carrera, p.pedido_propina, p.pedido_total,
+                e.estado_nombre AS pedido_estado_nombre
          FROM pagos_repartidor pr
          LEFT JOIN repartidores r ON pr.id_repartidor = r.id_repartidor
          LEFT JOIN pedidos p ON pr.id_pedido = p.id_pedido
@@ -62,17 +59,98 @@ export const obtenerPagoPorIdInterno = async id_pago_repartidor => {
     return rows.length ? rows[0] : null;
 };
 
-// GET - Todos los pagos.
+// Crea el pago automáticamente cuando el pedido está ENTREGADO.
+export const crearPagoRepartidorDesdePedido = async (id_pedido, conexion = conmysql) => {
+    if (!Number.isInteger(Number(id_pedido)) || Number(id_pedido) <= 0) throw new Error("El ID del pedido no es válido.");
+
+    const idPedido = Number(id_pedido);
+    const [pagosExistentes] = await conexion.query(
+        `SELECT * FROM pagos_repartidor WHERE id_pedido = ? ORDER BY id_pago_repartidor DESC LIMIT 1`,
+        [idPedido]
+    );
+
+    if (pagosExistentes.length) {
+        console.log(`[PagosRepartidor] El pedido ${idPedido} ya tiene pago. No se duplica.`);
+        return { creado: false, existente: true, pago: pagosExistentes[0] };
+    }
+
+    const [pedidos] = await conexion.query(
+        `SELECT p.id_pedido, p.pedido_codigo, p.id_repartidor, p.pedido_carrera, p.pedido_propina,
+                p.id_estado, e.estado_nombre
+         FROM pedidos p
+         LEFT JOIN estados e ON p.id_estado = e.id_estado
+         WHERE p.id_pedido = ? LIMIT 1`,
+        [idPedido]
+    );
+
+    if (!pedidos.length) throw new Error("El pedido no existe.");
+
+    const pedido = pedidos[0];
+    if (!pedido.id_repartidor) throw new Error(`El pedido ${idPedido} no tiene un repartidor asociado.`);
+    if (Number(pedido.id_estado) !== 15) {
+        throw new Error(`El pago al repartidor solo puede generarse cuando el pedido está ENTREGADO (estado 15). Estado actual: ${pedido.id_estado}`);
+    }
+
+    const carrera = Number(pedido.pedido_carrera ?? 0);
+    const propina = Number(pedido.pedido_propina ?? 0);
+    if (!Number.isFinite(carrera) || carrera < 0) throw new Error(`El pedido ${idPedido} tiene una carrera inválida.`);
+    if (!Number.isFinite(propina) || propina < 0) throw new Error(`El pedido ${idPedido} tiene una propina inválida.`);
+
+    // El repartidor recibe 95% de la carrera y 100% de la propina.
+    const porcentajeComision = PORCENTAJE_COMISION_REPARTIDOR;
+    const comisionCarrera = Number((carrera * porcentajeComision / 100).toFixed(2));
+    const carreraNeta = Number((carrera - comisionCarrera).toFixed(2));
+    const propinaRepartidor = Number(propina.toFixed(2));
+    const otros = 0;
+    const total = Number((carreraNeta + propinaRepartidor + otros).toFixed(2));
+
+    if (!Number.isFinite(total) || total < 0) {
+        throw new Error(`El total del pago del repartidor para el pedido ${idPedido} es inválido.`);
+    }
+
+    const [resultado] = await conexion.query(
+        `INSERT INTO pagos_repartidor (
+            id_repartidor, id_pedido, pago_repartidor_fecha, pago_repartidor_carrera,
+            pago_repartidor_propina, pago_repartidor_otros, pago_repartidor_total,
+            pago_repartidor_estado, pago_repartidor_fecha_pago
+         ) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, NULL)`,
+        [pedido.id_repartidor, pedido.id_pedido, carreraNeta, propinaRepartidor, otros, total, "PENDIENTE"]
+    );
+
+    const [pagoCreado] = await conexion.query(
+        `SELECT * FROM pagos_repartidor WHERE id_pago_repartidor = ? LIMIT 1`,
+        [resultado.insertId]
+    );
+
+    console.log("[PagosRepartidor] Pago creado automáticamente:", {
+        id_pago_repartidor: resultado.insertId,
+        id_pedido: pedido.id_pedido,
+        id_repartidor: pedido.id_repartidor,
+        estadoPedido: pedido.id_estado,
+        estadoNombre: pedido.estado_nombre,
+        carreraOriginal: carrera,
+        porcentajeComision,
+        comisionCarrera,
+        carreraNeta,
+        propina: propinaRepartidor,
+        otros,
+        total
+    });
+
+    return { creado: true, existente: false, pago: pagoCreado[0] };
+};
+
+// GET: todos los pagos según el rol.
 export const getPagosRepartidor = async (req, res) => {
     try {
         if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
 
         if (esAdministrativo(req)) {
             const [rows] = await conmysql.query(
-                `SELECT pr.*, r.repartidor_codigo, r.id_usuario AS repartidor_id_usuario,
-                        r.repartidor_placa, r.repartidor_tipo_vehiculo, r.repartidor_calificacion,
-                        p.pedido_codigo, p.id_cliente, p.id_local, p.pedido_carrera,
-                        p.pedido_propina, p.pedido_total, e.estado_nombre AS pedido_estado_nombre
+                `SELECT pr.*, r.repartidor_codigo, r.id_usuario AS repartidor_id_usuario, r.repartidor_placa,
+                        r.repartidor_tipo_vehiculo, r.repartidor_calificacion, p.pedido_codigo, p.id_cliente,
+                        p.id_local, p.pedido_carrera, p.pedido_propina, p.pedido_total,
+                        e.estado_nombre AS pedido_estado_nombre
                  FROM pagos_repartidor pr
                  LEFT JOIN repartidores r ON pr.id_repartidor = r.id_repartidor
                  LEFT JOIN pedidos p ON pr.id_pedido = p.id_pedido
@@ -97,17 +175,13 @@ export const getPagosRepartidor = async (req, res) => {
                  LEFT JOIN repartidores r ON pr.id_repartidor = r.id_repartidor
                  LEFT JOIN pedidos p ON pr.id_pedido = p.id_pedido
                  LEFT JOIN estados e ON p.id_estado = e.id_estado
-                 WHERE pr.id_repartidor = ?
-                 ORDER BY pr.id_pago_repartidor DESC`,
+                 WHERE pr.id_repartidor = ? ORDER BY pr.id_pago_repartidor DESC`,
                 [repartidor.id_repartidor]
             );
             return res.json(rows);
         }
 
-        return res.status(403).json({
-            success: false,
-            message: `El rol ${obtenerRol(req) || "SIN_ROL"} no tiene permisos para consultar pagos del repartidor.`
-        });
+        return res.status(403).json({ success: false, message: "No tienes permisos para consultar pagos del repartidor." });
     } catch (error) {
         console.error("[PagosRepartidor] Error getPagosRepartidor:", error);
         return res.status(500).json({
@@ -118,7 +192,7 @@ export const getPagosRepartidor = async (req, res) => {
     }
 };
 
-// GET - Pago por ID.
+// GET: pago por ID.
 export const getPagoRepartidorxid = async (req, res) => {
     try {
         const { id } = req.params;
@@ -146,7 +220,7 @@ export const getPagoRepartidorxid = async (req, res) => {
     }
 };
 
-// GET - Pagos por repartidor.
+// GET: pagos por repartidor.
 export const getPagosRepartidorPorRepartidor = async (req, res) => {
     try {
         const { id_repartidor } = req.params;
@@ -155,16 +229,14 @@ export const getPagosRepartidorPorRepartidor = async (req, res) => {
 
         if (esAdministrativo(req)) {
             const [rows] = await conmysql.query(
-                `SELECT pr.*, r.repartidor_codigo, r.id_usuario AS repartidor_id_usuario,
-                        r.repartidor_placa, r.repartidor_tipo_vehiculo, r.repartidor_calificacion,
-                        p.pedido_codigo, p.pedido_carrera, p.pedido_propina, p.pedido_total,
-                        e.estado_nombre AS pedido_estado_nombre
+                `SELECT pr.*, r.repartidor_codigo, r.id_usuario AS repartidor_id_usuario, r.repartidor_placa,
+                        r.repartidor_tipo_vehiculo, p.pedido_codigo, p.pedido_carrera, p.pedido_propina,
+                        p.pedido_total, e.estado_nombre AS pedido_estado_nombre
                  FROM pagos_repartidor pr
                  LEFT JOIN repartidores r ON pr.id_repartidor = r.id_repartidor
                  LEFT JOIN pedidos p ON pr.id_pedido = p.id_pedido
                  LEFT JOIN estados e ON p.id_estado = e.id_estado
-                 WHERE pr.id_repartidor = ?
-                 ORDER BY pr.id_pago_repartidor DESC`,
+                 WHERE pr.id_repartidor = ? ORDER BY pr.id_pago_repartidor DESC`,
                 [id_repartidor]
             );
             return res.json(rows);
@@ -179,15 +251,13 @@ export const getPagosRepartidorPorRepartidor = async (req, res) => {
             }
 
             const [rows] = await conmysql.query(
-                `SELECT pr.*, r.repartidor_codigo, r.repartidor_placa,
-                        p.pedido_codigo, p.pedido_carrera, p.pedido_propina, p.pedido_total,
-                        e.estado_nombre AS pedido_estado_nombre
+                `SELECT pr.*, r.repartidor_codigo, r.repartidor_placa, p.pedido_codigo,
+                        p.pedido_carrera, p.pedido_propina, p.pedido_total, e.estado_nombre AS pedido_estado_nombre
                  FROM pagos_repartidor pr
                  LEFT JOIN repartidores r ON pr.id_repartidor = r.id_repartidor
                  LEFT JOIN pedidos p ON pr.id_pedido = p.id_pedido
                  LEFT JOIN estados e ON p.id_estado = e.id_estado
-                 WHERE pr.id_repartidor = ?
-                 ORDER BY pr.id_pago_repartidor DESC`,
+                 WHERE pr.id_repartidor = ? ORDER BY pr.id_pago_repartidor DESC`,
                 [id_repartidor]
             );
             return res.json(rows);
@@ -200,7 +270,7 @@ export const getPagosRepartidorPorRepartidor = async (req, res) => {
     }
 };
 
-// GET - Pagos por pedido.
+// GET: pagos por pedido.
 export const getPagosRepartidorPorPedido = async (req, res) => {
     try {
         const { id_pedido } = req.params;
@@ -208,16 +278,14 @@ export const getPagosRepartidorPorPedido = async (req, res) => {
         if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
 
         const [rows] = await conmysql.query(
-            `SELECT pr.*, r.repartidor_codigo, r.id_usuario AS repartidor_id_usuario,
-                    r.repartidor_placa, r.repartidor_tipo_vehiculo,
-                    p.pedido_codigo, p.pedido_carrera, p.pedido_propina, p.pedido_total,
-                    e.estado_nombre AS pedido_estado_nombre
+            `SELECT pr.*, r.repartidor_codigo, r.id_usuario AS repartidor_id_usuario, r.repartidor_placa,
+                    r.repartidor_tipo_vehiculo, p.pedido_codigo, p.pedido_carrera, p.pedido_propina,
+                    p.pedido_total, e.estado_nombre AS pedido_estado_nombre
              FROM pagos_repartidor pr
              LEFT JOIN repartidores r ON pr.id_repartidor = r.id_repartidor
              LEFT JOIN pedidos p ON pr.id_pedido = p.id_pedido
              LEFT JOIN estados e ON p.id_estado = e.id_estado
-             WHERE pr.id_pedido = ?
-             ORDER BY pr.id_pago_repartidor DESC`,
+             WHERE pr.id_pedido = ? ORDER BY pr.id_pago_repartidor DESC`,
             [id_pedido]
         );
 
@@ -226,7 +294,6 @@ export const getPagosRepartidorPorPedido = async (req, res) => {
         if (tieneRol(req, ["REPARTIDOR"])) {
             const repartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
             if (!repartidor) return res.status(403).json({ success: false, message: "El usuario no tiene un repartidor asociado." });
-
             return res.json(rows.filter(pago => Number(pago.id_repartidor) === Number(repartidor.id_repartidor)));
         }
 
@@ -237,7 +304,7 @@ export const getPagosRepartidorPorPedido = async (req, res) => {
     }
 };
 
-// POST - Crear pago manual.
+// POST: crear pago manual.
 export const postPagosRepartidor = async (req, res) => {
     try {
         if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
@@ -259,8 +326,7 @@ export const postPagosRepartidor = async (req, res) => {
         if (!repartidores.length) return res.status(400).json({ success: false, message: "El repartidor no existe." });
 
         const [pedidos] = await conmysql.query(
-            `SELECT id_pedido, id_repartidor, id_estado, pedido_carrera, pedido_propina
-             FROM pedidos WHERE id_pedido = ? LIMIT 1`,
+            `SELECT id_pedido, id_repartidor, id_estado, pedido_carrera, pedido_propina FROM pedidos WHERE id_pedido = ? LIMIT 1`,
             [id_pedido]
         );
         if (!pedidos.length) return res.status(400).json({ success: false, message: "El pedido no existe." });
@@ -282,7 +348,7 @@ export const postPagosRepartidor = async (req, res) => {
         const otros = Number(pago_repartidor_otros ?? 0);
         const total = Number(pago_repartidor_total ?? carrera + propina + otros);
 
-        if (![carrera, propina, otros, total].every(Number.isFinite) || [carrera, propina, otros, total].some(valor => valor < 0)) {
+        if (![carrera, propina, otros, total].every(Number.isFinite) || [carrera, propina, otros, total].some(v => v < 0)) {
             return res.status(400).json({ success: false, message: "Los valores del pago no son válidos." });
         }
 
@@ -308,7 +374,7 @@ export const postPagosRepartidor = async (req, res) => {
     }
 };
 
-// PUT - Actualizar pago.
+// PUT/PATCH: actualizar pago.
 export const putPagosRepartidor = async (req, res) => {
     try {
         const { id } = req.params;
@@ -366,10 +432,9 @@ export const putPagosRepartidor = async (req, res) => {
     }
 };
 
-// PATCH - Actualización parcial.
 export const patchPagosRepartidor = async (req, res) => putPagosRepartidor(req, res);
 
-// DELETE - Eliminar pago.
+// DELETE: solo ADMINISTRADOR.
 export const deletePagosRepartidor = async (req, res) => {
     try {
         const { id } = req.params;
@@ -393,96 +458,12 @@ export const deletePagosRepartidor = async (req, res) => {
     }
 };
 
-// Crea automáticamente el pago cuando el pedido está ENTREGADO.
-export const crearPagoRepartidorDesdePedido = async (id_pedido, conexion = conmysql) => {
-    if (!Number.isInteger(Number(id_pedido)) || Number(id_pedido) <= 0) {
-        throw new Error("El ID del pedido no es válido.");
-    }
-
-    const idPedido = Number(id_pedido);
-    const [pagosExistentes] = await conexion.query(
-        `SELECT * FROM pagos_repartidor
-         WHERE id_pedido = ?
-         ORDER BY id_pago_repartidor DESC LIMIT 1`,
-        [idPedido]
-    );
-
-    if (pagosExistentes.length) {
-        console.log(`[PagosRepartidor] El pedido ${idPedido} ya tiene pago. No se duplica.`);
-        return { creado: false, existente: true, pago: pagosExistentes[0] };
-    }
-
-    const [pedidos] = await conexion.query(
-        `SELECT p.id_pedido, p.pedido_codigo, p.id_repartidor, p.pedido_carrera,
-                p.pedido_propina, p.id_estado, e.estado_nombre
-         FROM pedidos p
-         LEFT JOIN estados e ON p.id_estado = e.id_estado
-         WHERE p.id_pedido = ? LIMIT 1`,
-        [idPedido]
-    );
-
-    if (!pedidos.length) throw new Error("El pedido no existe.");
-
-    const pedido = pedidos[0];
-    if (!pedido.id_repartidor) throw new Error(`El pedido ${idPedido} no tiene un repartidor asociado.`);
-    if (Number(pedido.id_estado) !== 15) {
-        throw new Error(`El pago al repartidor solo puede generarse cuando el pedido está ENTREGADO (estado 15). Estado actual: ${pedido.id_estado}`);
-    }
-
-    const carrera = Number(pedido.pedido_carrera ?? 0);
-    const propina = Number(pedido.pedido_propina ?? 0);
-    if (!Number.isFinite(carrera) || carrera < 0) throw new Error(`El pedido ${idPedido} tiene un pedido_carrera inválido.`);
-    if (!Number.isFinite(propina) || propina < 0) throw new Error(`El pedido ${idPedido} tiene un pedido_propina inválido.`);
-
-    // La comisión es 5% de la carrera; el repartidor recibe 95% + 100% de la propina.
-    const porcentajeComision = PORCENTAJE_COMISION_REPARTIDOR;
-    const comision = Number((carrera * porcentajeComision / 100).toFixed(2));
-    const carreraNeta = Number((carrera - comision).toFixed(2));
-    const propinaRepartidor = Number(propina.toFixed(2));
-    const otros = 0;
-    const totalRepartidor = Number((carreraNeta + propinaRepartidor + otros).toFixed(2));
-
-    if (!Number.isFinite(totalRepartidor) || totalRepartidor < 0) {
-        throw new Error(`El total del pago del repartidor para el pedido ${idPedido} es inválido.`);
-    }
-
-    const estadoPago = "PENDIENTE";
-    const [resultado] = await conexion.query(
-        `INSERT INTO pagos_repartidor (
-            id_repartidor, id_pedido, pago_repartidor_fecha, pago_repartidor_carrera,
-            pago_repartidor_propina, pago_repartidor_otros, pago_repartidor_total,
-            pago_repartidor_estado, pago_repartidor_fecha_pago
-         ) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?, NULL)`,
-        [pedido.id_repartidor, pedido.id_pedido, carreraNeta, propinaRepartidor, otros, totalRepartidor, estadoPago]
-    );
-
-    const [pagoCreado] = await conexion.query(
-        `SELECT * FROM pagos_repartidor WHERE id_pago_repartidor = ? LIMIT 1`,
-        [resultado.insertId]
-    );
-
-    console.log("[PagosRepartidor] Pago creado automáticamente:", {
-        id_pago_repartidor: resultado.insertId,
-        id_pedido: pedido.id_pedido,
-        id_repartidor: pedido.id_repartidor,
-        estadoPedido: pedido.estado_nombre,
-        carrera,
-        porcentajeComision,
-        comision,
-        carreraNeta,
-        propina: propinaRepartidor,
-        otros,
-        totalRepartidor,
-        estadoPago
-    });
-
-    return { creado: true, existente: false, pago: pagoCreado[0] };
-};
-
 // Exportaciones auxiliares.
 export {
     obtenerRol,
     obtenerIdUsuario,
+    obtenerRepartidorDelUsuario,
+    obtenerPagoPorIdInterno,
     esAdministrativo,
     tieneRol,
     PORCENTAJE_COMISION_REPARTIDOR
