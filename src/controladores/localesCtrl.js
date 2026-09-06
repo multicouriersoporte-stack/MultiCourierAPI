@@ -148,7 +148,7 @@ export const putLocales = async (req, res) => {
 };
 
 // PATCH: Actualización parcial de local
-export const patchLocales = async (req, res) => {
+/* export const patchLocales = async (req, res) => {
     try {
         const { id } = req.params;
         const camposPermitidos = [
@@ -182,6 +182,55 @@ export const patchLocales = async (req, res) => {
         return res.json(rows[0]);
     } catch (error) {
         console.error("Error patchLocales:", error);
+        return res.status(500).json({ message: "Error al actualizar local", error: error.message });
+    }
+}; */
+
+export const patchLocales = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Campos permitidos para actualización parcial
+        const camposPermitidos = [
+            "local_nombre_comercial", "local_razon_social", "local_ruc", "local_descripcion",
+            "local_foto", "local_telefono", "local_email", "local_categoria", "id_provincia",
+            "id_canton", "local_direccion", "local_referencia", "local_latitud", "local_longitud",
+            "local_hora_apertura", "local_hora_cierre"
+        ];
+
+        // Construye dinámicamente el UPDATE con los campos enviados
+        const campos = [], valores = [];
+        for (const campo of camposPermitidos) {
+            if (req.body[campo] !== undefined) {
+                campos.push(`${campo} = ?`);
+                valores.push(req.body[campo]);
+            }
+        }
+
+        if (campos.length === 0) {
+            return res.status(400).json({ message: "No se proporcionaron campos válidos para actualizar" });
+        }
+
+        valores.push(Number(id));
+        const sql = `UPDATE locales SET ${campos.join(", ")} WHERE id_local = ?`;
+
+        console.log("📝 SQL PATCH:", sql);
+        console.log("📦 Valores:", valores);
+
+        const [result] = await conmysql.query(sql, valores);
+
+        // Verifica si el local existe cuando no hubo filas afectadas
+        if (result.affectedRows === 0) {
+            const [existe] = await conmysql.query(`SELECT id_local FROM locales WHERE id_local = ?`, [Number(id)]);
+            if (existe.length === 0) return res.status(404).json({ message: "Local no encontrado" });
+        }
+
+        // Devuelve el local actualizado
+        const [rows] = await conmysql.query(`SELECT * FROM locales WHERE id_local = ?`, [Number(id)]);
+        return res.json({ message: "Local actualizado correctamente", local: rows[0] });
+
+    } catch (error) {
+        console.error("❌ Error patchLocales:", error);
         return res.status(500).json({ message: "Error al actualizar local", error: error.message });
     }
 };
