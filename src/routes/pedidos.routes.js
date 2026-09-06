@@ -3,7 +3,7 @@ import express from "express";
 import {
   getPedidos, getPedidoPorId, getPedidosPorCliente, getPedidosPorLocal,
   getPedidoPorCodigo, getPedidosPorEstado, postPedido, putPedido,
-  patchPedido, entregarPedidoConPin, confirmarPagoPedido, deletePedido
+  patchPedido, entregarPedidoConPin, confirmarPagoPedido, deletePedido, getPedidoDetalles
 } from "../controladores/pedidosCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
