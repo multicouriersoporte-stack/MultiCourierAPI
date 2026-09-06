@@ -3,7 +3,7 @@ import express from "express";
 import {
   getPedidos, getPedidoPorId, getPedidosPorCliente, getPedidosPorLocal,
   getPedidoPorCodigo, getPedidosPorEstado, postPedido, putPedido,
-  patchPedido, entregarPedidoConPin, confirmarPagoPedido, deletePedido, getPedidoDetalles
+  patchPedido, entregarPedidoConPin, confirmarPagoPedido, deletePedido
 } from "../controladores/pedidosCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
@@ -29,7 +29,7 @@ router.post("/pedidos", verificarToken, permitirRoles("CLIENTE"), postPedido);
 // PUT/PATCH: CLIENTE, LOCAL, REPARTIDOR, SOPORTE y ADMINISTRADOR.
 // Las transiciones y campos permitidos se validan en pedidosCtrl.js.
 const ROLES_MODIFICAR = ["CLIENTE", "LOCAL", "REPARTIDOR", "SOPORTE", "ADMINISTRADOR"];
-router.get("/pedidos/:id/detalles", verificarToken, permitirRoles(...ROLES_GET), getPedidoDetalles);
+//router.get("/pedidos/:id/detalles", verificarToken, permitirRoles(...ROLES_GET), getPedidoDetalles);
 router.put("/pedidos/:id", verificarToken, permitirRoles(...ROLES_MODIFICAR), putPedido);
 router.patch("/pedidos/:id", verificarToken, permitirRoles(...ROLES_MODIFICAR), patchPedido);
 router.patch("/pedidos/:id/entregar", verificarToken, permitirRoles("REPARTIDOR"), entregarPedidoConPin);
