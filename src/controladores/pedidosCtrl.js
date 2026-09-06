@@ -551,25 +551,26 @@ export const getPedidoPorId = async (req, res) => {
     }
 
     const pedido = await obtenerPedidoPorIdInterno(id);
-    if (!pedido) return res.status(404).json({ success: false, message: "Pedido no encontrado" });
-
-    if (esAdministrativo(req)) return res.json(ocultarPedidoPin(pedido, req));
-
-    const obtenerDetalles = async () => {
-      const [detalles] = await conmysql.query(`
-        SELECT
-          pd.*, p.pedido_codigo, lp.id_local, lp.id_producto,
-          l.local_nombre_comercial, pr.producto_codigo, pr.producto_nombre
-        FROM pedido_detalles pd
-        LEFT JOIN pedidos p ON pd.id_pedido = p.id_pedido
-        LEFT JOIN local_productos lp ON pd.id_local_producto = lp.id_local_producto
-        LEFT JOIN locales l ON lp.id_local = l.id_local
-        LEFT JOIN productos pr ON lp.id_producto = pr.id_producto
-        WHERE pd.id_pedido = ?
-        ORDER BY pd.id_pedido_detalle ASC
-      `, [id]);
-      return detalles;
-    };
+        if (!pedido) return res.status(404).json({ success: false, message: "Pedido no encontrado" });
+    
+        const obtenerDetalles = async () => {
+          const [detalles] = await conmysql.query(`
+            SELECT
+              pd.*,
+              p.pedido_codigo,
+              lp.id_local, lp.id_producto,
+              l.local_nombre_comercial,
+              pr.producto_codigo, pr.producto_nombre, pr.producto_descripcion
+            FROM pedido_detalles pd
+            LEFT JOIN pedidos p ON pd.id_pedido = p.id_pedido
+            LEFT JOIN local_productos lp ON pd.id_local_producto = lp.id_local_producto
+            LEFT JOIN locales l ON lp.id_local = l.id_local
+            LEFT JOIN productos pr ON lp.id_producto = pr.id_producto
+            WHERE pd.id_pedido = ?
+            ORDER BY pd.id_pedido_detalle ASC
+          `, [id]);
+          return detalles;
+        };
 
     if (tieneRol(req, ["CLIENTE"])) {
       if (!(await verificarAccesoCliente(req, res, pedido.id_cliente))) return;
@@ -598,6 +599,12 @@ export const getPedidoPorId = async (req, res) => {
         });
       }
 
+      // Administrativos: pedido completo + detalles
+      if (esAdministrativo(req)) {
+        pedido.detalles = await obtenerDetalles();
+        return res.json(ocultarPedidoPin(pedido, req));
+      }
+      
       if (Number(pedido.id_local) !== Number(local.id_local)) {
         return res.status(403).json({
           success: false,
