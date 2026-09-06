@@ -105,7 +105,7 @@ export const putUsuarios = async (req, res) => {
 };
 
 // PATCH: Actualización parcial de usuario.
-export const patchUsuarios = async (req, res) => {
+/* export const patchUsuarios = async (req, res) => {
     try {
         const { id } = req.params;
         const camposPermitidos = ["usuario_codigo", "id_provincia", "id_canton", "usuario_cedula", "usuario_nombre", "usuario_apellido", "usuario_nombre_completo", "usuario_email", "usuario_telefono", "usuario_password", "usuario_foto", "usuario_fecha_nacimiento", "usuario_latitud", "usuario_longitud", "usuario_referencia", "id_estado", "usuario_fecha_registro", "usuario_fecha_actualizacion"];
@@ -122,6 +122,38 @@ export const patchUsuarios = async (req, res) => {
         if (result.affectedRows === 0) return res.status(404).json({ message: "Usuario no encontrado" });
         const [rows] = await conmysql.query(`SELECT * FROM usuarios WHERE id_usuario = ?`, [id]);
         res.json(rows[0]);
+    } catch (error) {
+        console.error("Error patchUsuarios:", error);
+        return res.status(500).json({ message: "Error al actualizar usuario", error: error.message });
+    }
+}; */
+
+// PATCH: Actualización parcial de usuario.
+export const patchUsuarios = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const camposPermitidos = ["usuario_nombre", "usuario_apellido", "usuario_nombre_completo", "usuario_email", "usuario_telefono", "usuario_foto", "usuario_latitud", "usuario_longitud", "usuario_referencia"];
+        const campos = [], valores = [];
+
+        // Solo permite actualizar campos autorizados.
+        for (const campo of camposPermitidos) {
+            if (req.body[campo] !== undefined) {
+                campos.push(`${campo} = ?`);
+                valores.push(req.body[campo]);
+            }
+        }
+
+        if (!campos.length) return res.status(400).json({ message: "No se proporcionaron campos válidos para actualizar" });
+
+        campos.push("usuario_fecha_actualizacion = NOW()");
+        valores.push(id);
+
+        const [result] = await conmysql.query(`UPDATE usuarios SET ${campos.join(", ")} WHERE id_usuario = ?`, valores);
+        if (!result.affectedRows) return res.status(404).json({ message: "Usuario no encontrado" });
+
+        // Retorna el usuario actualizado.
+        const [rows] = await conmysql.query(`SELECT * FROM usuarios WHERE id_usuario = ?`, [id]);
+        return res.json(rows[0]);
     } catch (error) {
         console.error("Error patchUsuarios:", error);
         return res.status(500).json({ message: "Error al actualizar usuario", error: error.message });
