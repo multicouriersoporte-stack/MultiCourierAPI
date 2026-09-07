@@ -52,3 +52,17 @@ export const verificarToken = (req, res, next) => {
         return res.status(401).json({ success: false, message: "No se pudo validar el token." });
     }
 };
+
+
+// Permite el acceso únicamente a usuarios CENTRAL y ADMINISTRADOR.
+export const soloAdminCentral = (req, res, next) => {
+    // Requiere autenticación previa.
+    if (!req.usuario) return res.status(401).json({ message: "No autenticado" });
+
+    // Normalizar y validar el rol.
+    const rol = String(req.usuario.rol || "").trim().toUpperCase();
+    if (rol !== "CENTRAL" && rol !== "ADMINISTRADOR")
+        return res.status(403).json({ message: "No tiene permisos para realizar esta operación" });
+
+    next();
+};
