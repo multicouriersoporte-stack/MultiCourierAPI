@@ -1,4 +1,4 @@
-/* import bcrypt from "bcrypt";
+import bcrypt from "bcrypt";
 import { conmysql } from "../db.js";
 
 // Campos públicos: excluye usuario_password.
@@ -353,8 +353,8 @@ export const deleteUsuarios = async (req, res) => {
         return res.status(500).json({ message: "Error al eliminar usuario", error: error.message });
     }
 };
- */
 
+/* 
 
 import bcrypt from "bcrypt";
 import { conmysql } from "../db.js";
@@ -621,3 +621,4 @@ export const deleteUsuarios = async (req, res) => {
         return res.status(500).json({ message: "Error al eliminar usuario", error: error.message });
     }
 };
+ */
