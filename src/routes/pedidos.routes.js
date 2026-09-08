@@ -39,13 +39,13 @@ router.patch("/pedidos/:id/confirmar-pago", verificarToken, permitirRoles("SOPOR
 router.delete("/pedidos/:id", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), deletePedido);
 
 export default router;
+
  */
 
 
-// src/routes/pedidos.routes.js
 import express from "express";
 import {
-  getPedidos, getPedidoPorId, getPedidosPorCliente, getPedidosPorLocal,
+  getPedidos, getPedidoPorId, getPedidoDetalles, getPedidosPorCliente, getPedidosPorLocal,
   getPedidoPorCodigo, getPedidosPorEstado, postPedido, putPedido,
   patchPedido, entregarPedidoConPin, confirmarPagoPedido, deletePedido
 } from "../controladores/pedidosCtrl.js";
@@ -54,9 +54,9 @@ import { permitirRoles } from "../middlewares/roles.middleware.js";
 
 const router = express.Router();
 
-// GET: consultas según rol. Administrativos pueden consultar todos.
 const ROLES_GET = ["CLIENTE", "LOCAL", "REPARTIDOR", "CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"];
 const ROLES_ADMIN = ["CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"];
+const ROLES_MODIFICAR = ["CLIENTE", "LOCAL", "REPARTIDOR", "SOPORTE", "ADMINISTRADOR"];
 
 router.get("/pedidos", verificarToken, permitirRoles(...ROLES_GET), getPedidos);
 router.get("/pedidos/admin", verificarToken, permitirRoles(...ROLES_ADMIN), getPedidos);
@@ -65,22 +65,19 @@ router.get("/pedidos/estado/:id_estado", verificarToken, permitirRoles(...ROLES_
 router.get("/pedidos/cliente/:id_cliente", verificarToken, permitirRoles(...ROLES_ADMIN), getPedidosPorCliente);
 router.get("/clientes/:id_cliente/pedidos", verificarToken, permitirRoles(...ROLES_ADMIN), getPedidosPorCliente);
 router.get("/pedidos/local/:id_local", verificarToken, permitirRoles("LOCAL", ...ROLES_ADMIN), getPedidosPorLocal);
+
+// Consultas específicas de pedido
 router.get("/pedidos/:id", verificarToken, permitirRoles(...ROLES_GET), getPedidoPorId);
+router.get("/pedidos/:id/detalles", verificarToken, permitirRoles(...ROLES_GET), getPedidoDetalles);
 
-// POST: únicamente CLIENTE puede crear pedidos.
+// Operaciones de actualización y creación
 router.post("/pedidos", verificarToken, permitirRoles("CLIENTE"), postPedido);
-
-// PUT/PATCH: CLIENTE, LOCAL, REPARTIDOR, SOPORTE y ADMINISTRADOR.
-// Las transiciones y campos permitidos se validan en pedidosCtrl.js.
-const ROLES_MODIFICAR = ["CLIENTE", "LOCAL", "REPARTIDOR", "SOPORTE", "ADMINISTRADOR"];
-//router.get("/pedidos/:id/detalles", verificarToken, permitirRoles(...ROLES_GET), getPedidoDetalles);
 router.put("/pedidos/:id", verificarToken, permitirRoles(...ROLES_MODIFICAR), putPedido);
 router.patch("/pedidos/:id", verificarToken, permitirRoles(...ROLES_MODIFICAR), patchPedido);
 router.patch("/pedidos/:id/entregar", verificarToken, permitirRoles("REPARTIDOR"), entregarPedidoConPin);
 router.patch("/pedidos/:id/confirmar-pago", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), confirmarPagoPedido);
 
-// DELETE: únicamente SOPORTE y ADMINISTRADOR.
+// Eliminación de pedidos
 router.delete("/pedidos/:id", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), deletePedido);
 
 export default router;
-
