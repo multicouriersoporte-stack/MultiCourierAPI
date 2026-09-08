@@ -24,43 +24,54 @@ router.patch("/repartidores/:id/estado", cambiarEstadoRepartidor);
 
 export default router;
  */
-// src/app/MultiCourierServicios/Usuarios/repartidores.service.ts
 
-import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { IRepartidores } from 'src/app/MultiCourierInterfaces/usuarios';
-import { PedidoRepartidorResumen } from 'src/app/MultiCourierServicios/Pedidos/pedidos.service';
+// src/rutas/repartidoresRuta.js
+import { Router } from "express";
 
-@Injectable({ providedIn: 'root' })
-export class RepartidoresService {
+import {
+    getRepartidores,
+    getRepartidoresDisponibles,
+    getRepartidorxid,
+    getRepartidorPorUsuario,
+    getRepartidorPorCodigo,
+    postRepartidores,
+    cambiarEstadoRepartidor,
+    putRepartidores,
+    patchRepartidores,
+    deleteRepartidores
+} from "../controladores/repartidoresCtrl.js";
 
-  private readonly apiUrl = 'https://multicourierapi.onrender.com/api';
+const router = Router();
 
-  constructor(private http: HttpClient) { }
+// GET - Obtener todos los repartidores
+router.get("/", getRepartidores);
 
-  /** Lista todos los repartidores. */
-  getRepartidores(): Observable<IRepartidores[]> {
-    return this.http.get<IRepartidores[]>(`${this.apiUrl}/repartidores`);
-  }
+// GET - Obtener repartidores disponibles
+router.get("/disponibles", getRepartidoresDisponibles);
 
-  /** Lista repartidores disponibles para recibir pedidos. */
-  getRepartidoresDisponibles(): Observable<IRepartidores[]> {
-    return this.http.get<IRepartidores[]>(`${this.apiUrl}/repartidores/disponibles`);
-  }
+// GET - Obtener repartidor por ID
+router.get("/:id", getRepartidorxid);
 
-  /** Obtiene un repartidor por su ID. */
-  getRepartidorPorId(idRepartidor: number): Observable<IRepartidores> {
-    return this.http.get<IRepartidores>(`${this.apiUrl}/repartidores/${idRepartidor}`);
-  }
+// GET - Obtener repartidor por ID de usuario
+router.get("/usuario/:id_usuario", getRepartidorPorUsuario);
 
-  /** Obtiene las ofertas/asignaciones de repartidores para un pedido específico. */
-  getRepartidoresPorPedido(idPedido: number): Observable<PedidoRepartidorResumen[]> {
-    return this.http.get<PedidoRepartidorResumen[]>(`${this.apiUrl}/pedidos/${idPedido}/repartidores`);
-  }
+// GET - Obtener repartidor por código
+router.get("/codigo/:codigo", getRepartidorPorCodigo);
 
-  /** Obtiene una relación específica pedido-repartidor por su ID. */
-  getPedidoRepartidor(idPedidoRepartidor: number): Observable<PedidoRepartidorResumen> {
-    return this.http.get<PedidoRepartidorResumen>(`${this.apiUrl}/pedidos-repartidor/${idPedidoRepartidor}`);
-  }
-}
+// POST - Crear repartidor
+router.post("/", postRepartidores);
+
+// PATCH - Cambiar únicamente el estado
+router.patch("/:id/estado", cambiarEstadoRepartidor);
+
+// PUT - Actualizar repartidor completo
+router.put("/:id", putRepartidores);
+
+// PATCH - Actualizar parcialmente un repartidor
+router.patch("/:id", patchRepartidores);
+
+// DELETE - Eliminar repartidor
+router.delete("/:id", deleteRepartidores);
+
+export default router;
+
