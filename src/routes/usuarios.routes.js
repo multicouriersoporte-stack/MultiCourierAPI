@@ -3,7 +3,7 @@ import {
     getUsuarios, getUsuarioxid, getUsuarioPorCedula, getUsuarioPorEmail,
     getUsuarioPorCodigo, getRepartidorPorUsuario, postUsuarios, putUsuarios,
     patchUsuarios, deleteUsuarios
-} from "../controllers/usuarios.controller.js";
+} from "../controladores/usuariosCtrl.js";
 import { verificarToken } from "../middleware/auth.js";
 import { soloAdminCentral } from "../middleware/soloAdminCentral.js";
 
