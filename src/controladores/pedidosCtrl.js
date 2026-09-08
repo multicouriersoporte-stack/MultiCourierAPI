@@ -1,4 +1,4 @@
-/* // src/controladores/pedidosCtrl.js
+// src/controladores/pedidosCtrl.js
 import { conmysql } from "../db.js";
 import { asignarRepartidorAutomaticamente } from "./pedidorepartidoresCtrl.js";
 import { crearPagoLocalDesdePedido } from "./pagoslocalesCtrl.js";
@@ -1767,9 +1767,9 @@ export {
   esAdministrativo,
   tieneRol
 };
- */
 
 
+/* 
 import { conmysql } from "../db.js";
 import { asignarRepartidorAutomaticamente } from "./pedidorepartidoresCtrl.js";
 import { crearPagoLocalDesdePedido } from "./pagoslocalesCtrl.js";
@@ -2547,4 +2547,4 @@ export {
   obtenerRol, obtenerRoles, obtenerIdUsuario, obtenerClienteDelUsuario, obtenerLocalDelUsuario,
   obtenerRepartidorDelUsuario, verificarAccesoCliente, obtenerPedidoPorIdInterno, generarPedidoPin,
   ocultarPedidoPin, ocultarPedidosPin, esAdministrativo, tieneRol
-};
+}; */
