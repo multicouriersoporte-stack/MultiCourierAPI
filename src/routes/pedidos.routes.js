@@ -1,4 +1,4 @@
-/* // src/routes/pedidos.routes.js
+// src/routes/pedidos.routes.js
 import express from "express";
 import {
   getPedidos, getPedidoPorId, getPedidosPorCliente, getPedidosPorLocal,
@@ -39,9 +39,9 @@ router.patch("/pedidos/:id/confirmar-pago", verificarToken, permitirRoles("SOPOR
 router.delete("/pedidos/:id", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), deletePedido);
 
 export default router;
- */
 
 
+/* 
 
 import express from "express";
 import { getPedidos, getPedidoPorId, getPedidoDetalles, getPedidosPorCliente, getPedidosPorLocal, getPedidoPorCodigo, getPedidosPorEstado, postPedido, putPedido, patchPedido, entregarPedidoConPin, confirmarPagoPedido, deletePedido } from "../controladores/pedidosCtrl.js";
@@ -75,3 +75,4 @@ router.patch("/pedidos/:id/confirmar-pago", verificarToken, permitirRoles("SOPOR
 router.delete("/pedidos/:id", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), deletePedido);
 
 export default router;
+ */
