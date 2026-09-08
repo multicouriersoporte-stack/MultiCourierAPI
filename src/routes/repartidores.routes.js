@@ -24,36 +24,43 @@ router.patch("/repartidores/:id/estado", cambiarEstadoRepartidor);
 
 export default router;
  */
-import express from "express";
-import {
-    getRepartidores, getRepartidoresDisponibles, getRepartidorxid,
-    getRepartidorPorUsuario, getRepartidorPorCodigo, postRepartidores,
-    cambiarEstadoRepartidor, putRepartidores, patchRepartidores, deleteRepartidores
-} from "../controladores/repartidoresCtrl.js";
-import { verificarToken } from "../middlewares/auth.middleware.js";
-import { permitirRoles } from "../middlewares/roles.middleware.js";
+// src/app/MultiCourierServicios/Usuarios/repartidores.service.ts
 
-const router = express.Router();
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { IRepartidores } from 'src/app/MultiCourierInterfaces/usuarios';
+import { PedidoRepartidorResumen } from 'src/app/MultiCourierServicios/Pedidos/pedidos.service';
 
-// Consultas
-router.get("/repartidores", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidores);
-router.get("/repartidores/disponibles", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidoresDisponibles);
-router.get("/repartidores/usuario/:id_usuario", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorPorUsuario);
-router.get("/repartidores/codigo/:codigo", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorPorCodigo);
-router.get("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorxid);
+@Injectable({ providedIn: 'root' })
+export class RepartidoresService {
 
-// Crear
-router.post("/repartidores", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), postRepartidores);
+  private readonly apiUrl = 'https://multicourierapi.onrender.com/api';
 
-// Estado
-router.patch("/repartidores/:id/estado", verificarToken, permitirRoles("REPARTIDOR", "CENTRAL", "SUPERVISOR", "SOPORTE"), cambiarEstadoRepartidor);
+  constructor(private http: HttpClient) { }
 
-// Actualizar
-router.put("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), putRepartidores);
-router.patch("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), patchRepartidores);
+  /** Lista todos los repartidores. */
+  getRepartidores(): Observable<IRepartidores[]> {
+    return this.http.get<IRepartidores[]>(`${this.apiUrl}/repartidores`);
+  }
 
-// Eliminar
-router.delete("/repartidores/:id", verificarToken, permitirRoles("SUPERVISOR", "SOPORTE"), deleteRepartidores);
+  /** Lista repartidores disponibles para recibir pedidos. */
+  getRepartidoresDisponibles(): Observable<IRepartidores[]> {
+    return this.http.get<IRepartidores[]>(`${this.apiUrl}/repartidores/disponibles`);
+  }
 
-export default router;
+  /** Obtiene un repartidor por su ID. */
+  getRepartidorPorId(idRepartidor: number): Observable<IRepartidores> {
+    return this.http.get<IRepartidores>(`${this.apiUrl}/repartidores/${idRepartidor}`);
+  }
 
+  /** Obtiene las ofertas/asignaciones de repartidores para un pedido específico. */
+  getRepartidoresPorPedido(idPedido: number): Observable<PedidoRepartidorResumen[]> {
+    return this.http.get<PedidoRepartidorResumen[]>(`${this.apiUrl}/pedidos/${idPedido}/repartidores`);
+  }
+
+  /** Obtiene una relación específica pedido-repartidor por su ID. */
+  getPedidoRepartidor(idPedidoRepartidor: number): Observable<PedidoRepartidorResumen> {
+    return this.http.get<PedidoRepartidorResumen>(`${this.apiUrl}/pedidos-repartidor/${idPedidoRepartidor}`);
+  }
+}
