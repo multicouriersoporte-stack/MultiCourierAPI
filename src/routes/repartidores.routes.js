@@ -24,43 +24,35 @@ router.patch("/repartidores/:id/estado", cambiarEstadoRepartidor);
 
 export default router;
  */
-
 import express from "express";
 import {
-    getRepartidores,
-    getRepartidorxid,
-    getRepartidorPorUsuario,
-    getRepartidorPorCodigo,
-    // getRepartidoresDisponibles,
-    // getSiguienteRepartidor,
-    postRepartidores,
-    cambiarEstadoRepartidor,
-    putRepartidores,
-    patchRepartidores,
-    deleteRepartidores
+    getRepartidores, getRepartidoresDisponibles, getRepartidorxid,
+    getRepartidorPorUsuario, getRepartidorPorCodigo, postRepartidores,
+    cambiarEstadoRepartidor, putRepartidores, patchRepartidores, deleteRepartidores
 } from "../controladores/repartidoresCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
 
 const router = express.Router();
 
-// CONSULTAS
+// Consultas
 router.get("/repartidores", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidores);
-router.get("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorxid);
+router.get("/repartidores/disponibles", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidoresDisponibles);
 router.get("/repartidores/usuario/:id_usuario", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorPorUsuario);
 router.get("/repartidores/codigo/:codigo", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorPorCodigo);
+router.get("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorxid);
 
-// CREAR
+// Crear
 router.post("/repartidores", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), postRepartidores);
 
-// CAMBIAR ESTADO
+// Estado
 router.patch("/repartidores/:id/estado", verificarToken, permitirRoles("REPARTIDOR", "CENTRAL", "SUPERVISOR", "SOPORTE"), cambiarEstadoRepartidor);
 
-// ACTUALIZAR
+// Actualizar
 router.put("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), putRepartidores);
 router.patch("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), patchRepartidores);
 
-// ELIMINAR
+// Eliminar
 router.delete("/repartidores/:id", verificarToken, permitirRoles("SUPERVISOR", "SOPORTE"), deleteRepartidores);
 
 export default router;
