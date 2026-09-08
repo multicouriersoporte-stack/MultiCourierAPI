@@ -4,8 +4,8 @@ import {
     getUsuarioPorCodigo, getRepartidorPorUsuario, postUsuarios, putUsuarios,
     patchUsuarios, deleteUsuarios
 } from "../controladores/usuariosCtrl.js";
-import { verificarToken } from "../middleware/auth.js";
-import { soloAdminCentral } from "../middleware/soloAdminCentral.js";
+import { verificarToken } from "../middlewares/auth.middleware.js";
+import { soloAdminCentral } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
