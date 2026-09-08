@@ -26,52 +26,44 @@ export default router;
  */
 
 // src/rutas/repartidoresRuta.js
-import { Router } from "express";
 
+import express from "express";
 import {
     getRepartidores,
-    getRepartidoresDisponibles,
     getRepartidorxid,
     getRepartidorPorUsuario,
     getRepartidorPorCodigo,
+    // getRepartidoresDisponibles,
+    // getSiguienteRepartidor,
     postRepartidores,
     cambiarEstadoRepartidor,
     putRepartidores,
     patchRepartidores,
     deleteRepartidores
 } from "../controladores/repartidoresCtrl.js";
+import { verificarToken } from "../middlewares/auth.middleware.js";
+import { permitirRoles } from "../middlewares/roles.middleware.js";
 
-const router = Router();
+const router = express.Router();
 
-// GET - Obtener todos los repartidores
-router.get("/", getRepartidores);
+// CONSULTAS
+router.get("/repartidores", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidores);
+router.get("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorxid);
+router.get("/repartidores/usuario/:id_usuario", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorPorUsuario);
+router.get("/repartidores/codigo/:codigo", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorPorCodigo);
 
-// GET - Obtener repartidores disponibles
-router.get("/disponibles", getRepartidoresDisponibles);
+// CREAR
+router.post("/repartidores", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), postRepartidores);
 
-// GET - Obtener repartidor por ID
-router.get("/:id", getRepartidorxid);
+// CAMBIAR ESTADO
+router.patch("/repartidores/:id/estado", verificarToken, permitirRoles("REPARTIDOR", "CENTRAL", "SUPERVISOR", "SOPORTE"), cambiarEstadoRepartidor);
 
-// GET - Obtener repartidor por ID de usuario
-router.get("/usuario/:id_usuario", getRepartidorPorUsuario);
+// ACTUALIZAR
+router.put("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), putRepartidores);
+router.patch("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), patchRepartidores);
 
-// GET - Obtener repartidor por código
-router.get("/codigo/:codigo", getRepartidorPorCodigo);
-
-// POST - Crear repartidor
-router.post("/", postRepartidores);
-
-// PATCH - Cambiar únicamente el estado
-router.patch("/:id/estado", cambiarEstadoRepartidor);
-
-// PUT - Actualizar repartidor completo
-router.put("/:id", putRepartidores);
-
-// PATCH - Actualizar parcialmente un repartidor
-router.patch("/:id", patchRepartidores);
-
-// DELETE - Eliminar repartidor
-router.delete("/:id", deleteRepartidores);
+// ELIMINAR
+router.delete("/repartidores/:id", verificarToken, permitirRoles("SUPERVISOR", "SOPORTE"), deleteRepartidores);
 
 export default router;
 
