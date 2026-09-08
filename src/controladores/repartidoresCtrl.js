@@ -115,21 +115,24 @@ export const deleteRepartidores = async (req, res) => {
     }
 };
  */
-
 // src/controladores/repartidoresCtrl.js
 import { conmysql } from "../db.js";
 
-// Obtener todos los repartidores
+// Consultas
 export const getRepartidores = async (req, res) => {
     try {
         const [result] = await conmysql.query(`
-            SELECT r.*, er.estado_repartidor_nombre, er.estado_repartidor_descripcion,
-                   er.estado_repartidor_visible_front, er.estado_repartidor_permite_pedidos,
-                   er.estado_repartidor_permite_seleccion
+            SELECT r.*,
+                er.estado_repartidor_nombre,
+                er.estado_repartidor_descripcion,
+                er.estado_repartidor_visible_front,
+                er.estado_repartidor_permite_pedidos,
+                er.estado_repartidor_permite_seleccion
             FROM repartidores r
             LEFT JOIN estados_repartidor er ON r.id_estado_repartidor = er.id_estado_repartidor
             ORDER BY CASE WHEN r.repartidor_posicion_ranking IS NULL THEN 999999 ELSE r.repartidor_posicion_ranking END ASC,
-                     r.repartidor_total_pedidos ASC, r.repartidor_calificacion DESC
+                r.repartidor_total_pedidos ASC,
+                r.repartidor_calificacion DESC
         `);
         return res.json(result);
     } catch (error) {
@@ -138,18 +141,48 @@ export const getRepartidores = async (req, res) => {
     }
 };
 
+// Obtener repartidores disponibles para asignación manual
+export const getRepartidoresDisponibles = async (req, res) => {
+    try {
+        const [result] = await conmysql.query(`
+            SELECT r.*,
+                er.estado_repartidor_nombre,
+                er.estado_repartidor_descripcion,
+                er.estado_repartidor_visible_front,
+                er.estado_repartidor_permite_pedidos,
+                er.estado_repartidor_permite_seleccion
+            FROM repartidores r
+            INNER JOIN estados_repartidor er ON r.id_estado_repartidor = er.id_estado_repartidor
+            WHERE er.estado_repartidor_estado = 1
+                AND er.estado_repartidor_permite_pedidos = 1
+                AND er.estado_repartidor_permite_seleccion = 1
+            ORDER BY CASE WHEN r.repartidor_posicion_ranking IS NULL THEN 999999 ELSE r.repartidor_posicion_ranking END ASC,
+                r.repartidor_total_pedidos ASC,
+                r.repartidor_calificacion DESC
+        `);
+        return res.json(result);
+    } catch (error) {
+        console.error("Error getRepartidoresDisponibles:", error);
+        return res.status(500).json({ message: "Error al consultar repartidores disponibles", error: error.message });
+    }
+};
+
 // Obtener repartidor por ID
 export const getRepartidorxid = async (req, res) => {
     try {
         const { id } = req.params;
         const [result] = await conmysql.query(`
-            SELECT r.*, er.estado_repartidor_nombre, er.estado_repartidor_descripcion,
-                   er.estado_repartidor_visible_front, er.estado_repartidor_permite_pedidos,
-                   er.estado_repartidor_permite_seleccion
+            SELECT r.*,
+                er.estado_repartidor_nombre,
+                er.estado_repartidor_descripcion,
+                er.estado_repartidor_visible_front,
+                er.estado_repartidor_permite_pedidos,
+                er.estado_repartidor_permite_seleccion
             FROM repartidores r
             LEFT JOIN estados_repartidor er ON r.id_estado_repartidor = er.id_estado_repartidor
             WHERE r.id_repartidor = ?
         `, [id]);
+
         if (result.length === 0) return res.status(404).json({ id_repartidor: 0, message: "Repartidor no encontrado" });
         return res.json(result[0]);
     } catch (error) {
@@ -163,13 +196,17 @@ export const getRepartidorPorUsuario = async (req, res) => {
     try {
         const { id_usuario } = req.params;
         const [result] = await conmysql.query(`
-            SELECT r.*, er.estado_repartidor_nombre, er.estado_repartidor_descripcion,
-                   er.estado_repartidor_visible_front, er.estado_repartidor_permite_pedidos,
-                   er.estado_repartidor_permite_seleccion
+            SELECT r.*,
+                er.estado_repartidor_nombre,
+                er.estado_repartidor_descripcion,
+                er.estado_repartidor_visible_front,
+                er.estado_repartidor_permite_pedidos,
+                er.estado_repartidor_permite_seleccion
             FROM repartidores r
             LEFT JOIN estados_repartidor er ON r.id_estado_repartidor = er.id_estado_repartidor
             WHERE r.id_usuario = ?
         `, [id_usuario]);
+
         if (result.length === 0) return res.status(404).json({ message: "No existe un repartidor asociado a este usuario" });
         return res.json(result[0]);
     } catch (error) {
@@ -183,13 +220,17 @@ export const getRepartidorPorCodigo = async (req, res) => {
     try {
         const { codigo } = req.params;
         const [result] = await conmysql.query(`
-            SELECT r.*, er.estado_repartidor_nombre, er.estado_repartidor_descripcion,
-                   er.estado_repartidor_visible_front, er.estado_repartidor_permite_pedidos,
-                   er.estado_repartidor_permite_seleccion
+            SELECT r.*,
+                er.estado_repartidor_nombre,
+                er.estado_repartidor_descripcion,
+                er.estado_repartidor_visible_front,
+                er.estado_repartidor_permite_pedidos,
+                er.estado_repartidor_permite_seleccion
             FROM repartidores r
             LEFT JOIN estados_repartidor er ON r.id_estado_repartidor = er.id_estado_repartidor
             WHERE r.repartidor_codigo = ?
         `, [codigo]);
+
         if (result.length === 0) return res.status(404).json({ message: "Repartidor no encontrado" });
         return res.json(result[0]);
     } catch (error) {
@@ -198,37 +239,17 @@ export const getRepartidorPorCodigo = async (req, res) => {
     }
 };
 
-// Obtener el primer repartidor disponible (estados 1 = LISTO, 2 = REPARTIENDO)
-export const getRepartidorDisponible = async (req, res) => {
-    try {
-        const [result] = await conmysql.query(`
-            SELECT r.id_repartidor, r.id_usuario, r.repartidor_codigo, r.repartidor_tipo_vehiculo,
-                   r.repartidor_posicion_ranking, r.repartidor_total_pedidos, r.repartidor_calificacion,
-                   r.repartidor_confianza, r.id_estado_repartidor, er.estado_repartidor_nombre
-            FROM repartidores r
-            INNER JOIN estados_repartidor er ON r.id_estado_repartidor = er.id_estado_repartidor
-            WHERE r.id_estado_repartidor IN (1, 2) AND er.estado_repartidor_estado = 1
-            ORDER BY CASE WHEN r.repartidor_posicion_ranking IS NULL THEN 999999 ELSE r.repartidor_posicion_ranking END ASC,
-                     r.repartidor_total_pedidos ASC, r.repartidor_calificacion DESC
-            LIMIT 1
-        `);
-        if (result.length === 0) return res.status(404).json({ message: "No hay repartidores disponibles" });
-        return res.json(result[0]);
-    } catch (error) {
-        console.error("Error getRepartidorDisponible:", error);
-        return res.status(500).json({ message: "Error al buscar repartidor disponible", error: error.message });
-    }
-};
-
 // Crear repartidor
 export const postRepartidores = async (req, res) => {
     try {
         const {
-            id_usuario, id_estado_repartidor, repartidor_codigo, repartidor_placa, repartidor_tipo_vehiculo,
-            repartidor_calificacion, repartidor_puntos, repartidor_posicion_ranking, repartidor_total_pedidos,
-            repartidor_pedidos_aceptados, repartidor_pedidos_rechazados, repartidor_pedidos_no_entregados,
-            repartidor_porcentaje_aceptacion, repartidor_horas_conectado, repartidor_limite_billetera,
-            repartidor_confianza, repartidor_permite_telefono, repartidor_fecha_ingreso
+            id_usuario, id_estado_repartidor, repartidor_codigo, repartidor_placa,
+            repartidor_tipo_vehiculo, repartidor_calificacion, repartidor_puntos,
+            repartidor_posicion_ranking, repartidor_total_pedidos, repartidor_pedidos_aceptados,
+            repartidor_pedidos_rechazados, repartidor_pedidos_no_entregados,
+            repartidor_porcentaje_aceptacion, repartidor_horas_conectado,
+            repartidor_limite_billetera, repartidor_confianza, repartidor_permite_telefono,
+            repartidor_fecha_ingreso
         } = req.body;
 
         if (!id_usuario) return res.status(400).json({ message: "id_usuario es obligatorio" });
@@ -243,26 +264,32 @@ export const postRepartidores = async (req, res) => {
 
         const [result] = await conmysql.query(`
             INSERT INTO repartidores (
-                id_usuario, id_estado_repartidor, repartidor_codigo, repartidor_placa, repartidor_tipo_vehiculo,
-                repartidor_calificacion, repartidor_puntos, repartidor_posicion_ranking, repartidor_total_pedidos,
-                repartidor_pedidos_aceptados, repartidor_pedidos_rechazados, repartidor_pedidos_no_entregados,
-                repartidor_porcentaje_aceptacion, repartidor_horas_conectado, repartidor_limite_billetera,
-                repartidor_confianza, repartidor_permite_telefono, repartidor_fecha_ingreso
+                id_usuario, id_estado_repartidor, repartidor_codigo, repartidor_placa,
+                repartidor_tipo_vehiculo, repartidor_calificacion, repartidor_puntos,
+                repartidor_posicion_ranking, repartidor_total_pedidos, repartidor_pedidos_aceptados,
+                repartidor_pedidos_rechazados, repartidor_pedidos_no_entregados,
+                repartidor_porcentaje_aceptacion, repartidor_horas_conectado,
+                repartidor_limite_billetera, repartidor_confianza, repartidor_permite_telefono,
+                repartidor_fecha_ingreso
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             id_usuario, estadoRepartidor, repartidor_codigo || null, repartidor_placa || null,
-            repartidor_tipo_vehiculo || null, repartidor_calificacion ?? 5.00, repartidor_puntos ?? 0,
-            repartidor_posicion_ranking ?? null, repartidor_total_pedidos ?? 0, repartidor_pedidos_aceptados ?? 0,
+            repartidor_tipo_vehiculo || null, repartidor_calificacion ?? 5.00,
+            repartidor_puntos ?? 0, repartidor_posicion_ranking ?? null,
+            repartidor_total_pedidos ?? 0, repartidor_pedidos_aceptados ?? 0,
             repartidor_pedidos_rechazados ?? 0, repartidor_pedidos_no_entregados ?? 0,
             repartidor_porcentaje_aceptacion ?? 100.00, repartidor_horas_conectado ?? 0,
-            repartidor_limite_billetera ?? 25.00, repartidor_confianza ?? 0, repartidor_permite_telefono ?? 0,
-            repartidor_fecha_ingreso || new Date()
+            repartidor_limite_billetera ?? 25.00, repartidor_confianza ?? 0,
+            repartidor_permite_telefono ?? 0, repartidor_fecha_ingreso || new Date()
         ]);
 
         const [repartidor] = await conmysql.query(`
-            SELECT r.*, er.estado_repartidor_nombre, er.estado_repartidor_descripcion,
-                   er.estado_repartidor_visible_front, er.estado_repartidor_permite_pedidos,
-                   er.estado_repartidor_permite_seleccion
+            SELECT r.*,
+                er.estado_repartidor_nombre,
+                er.estado_repartidor_descripcion,
+                er.estado_repartidor_visible_front,
+                er.estado_repartidor_permite_pedidos,
+                er.estado_repartidor_permite_seleccion
             FROM repartidores r
             LEFT JOIN estados_repartidor er ON r.id_estado_repartidor = er.id_estado_repartidor
             WHERE r.id_repartidor = ?
@@ -280,6 +307,7 @@ export const cambiarEstadoRepartidor = async (req, res) => {
     try {
         const { id } = req.params;
         const { id_estado_repartidor } = req.body;
+
         if (!id_estado_repartidor) return res.status(400).json({ message: "id_estado_repartidor es obligatorio" });
 
         const [estado] = await conmysql.query(`
@@ -287,11 +315,13 @@ export const cambiarEstadoRepartidor = async (req, res) => {
             FROM estados_repartidor
             WHERE id_estado_repartidor = ? AND estado_repartidor_estado = 1
         `, [id_estado_repartidor]);
+
         if (estado.length === 0) return res.status(400).json({ message: "El estado del repartidor no existe o está inactivo" });
 
         const [repartidor] = await conmysql.query(`
             SELECT id_repartidor FROM repartidores WHERE id_repartidor = ?
         `, [id]);
+
         if (repartidor.length === 0) return res.status(404).json({ message: "Repartidor no encontrado" });
 
         await conmysql.query(`
@@ -299,9 +329,12 @@ export const cambiarEstadoRepartidor = async (req, res) => {
         `, [id_estado_repartidor, id]);
 
         const [resultado] = await conmysql.query(`
-            SELECT r.*, er.estado_repartidor_nombre, er.estado_repartidor_descripcion,
-                   er.estado_repartidor_visible_front, er.estado_repartidor_permite_pedidos,
-                   er.estado_repartidor_permite_seleccion
+            SELECT r.*,
+                er.estado_repartidor_nombre,
+                er.estado_repartidor_descripcion,
+                er.estado_repartidor_visible_front,
+                er.estado_repartidor_permite_pedidos,
+                er.estado_repartidor_permite_seleccion
             FROM repartidores r
             LEFT JOIN estados_repartidor er ON r.id_estado_repartidor = er.id_estado_repartidor
             WHERE r.id_repartidor = ?
@@ -319,11 +352,13 @@ export const putRepartidores = async (req, res) => {
     try {
         const { id } = req.params;
         const {
-            id_usuario, id_estado_repartidor, repartidor_codigo, repartidor_placa, repartidor_tipo_vehiculo,
-            repartidor_calificacion, repartidor_puntos, repartidor_posicion_ranking, repartidor_total_pedidos,
-            repartidor_pedidos_aceptados, repartidor_pedidos_rechazados, repartidor_pedidos_no_entregados,
-            repartidor_porcentaje_aceptacion, repartidor_horas_conectado, repartidor_limite_billetera,
-            repartidor_confianza, repartidor_permite_telefono, repartidor_fecha_ingreso
+            id_usuario, id_estado_repartidor, repartidor_codigo, repartidor_placa,
+            repartidor_tipo_vehiculo, repartidor_calificacion, repartidor_puntos,
+            repartidor_posicion_ranking, repartidor_total_pedidos, repartidor_pedidos_aceptados,
+            repartidor_pedidos_rechazados, repartidor_pedidos_no_entregados,
+            repartidor_porcentaje_aceptacion, repartidor_horas_conectado,
+            repartidor_limite_billetera, repartidor_confianza, repartidor_permite_telefono,
+            repartidor_fecha_ingreso
         } = req.body;
 
         if (!id_usuario) return res.status(400).json({ message: "id_usuario es obligatorio" });
@@ -333,31 +368,38 @@ export const putRepartidores = async (req, res) => {
             SELECT id_estado_repartidor FROM estados_repartidor
             WHERE id_estado_repartidor = ? AND estado_repartidor_estado = 1
         `, [id_estado_repartidor]);
+
         if (estado.length === 0) return res.status(400).json({ message: "El estado del repartidor no existe o está inactivo" });
 
         const [result] = await conmysql.query(`
             UPDATE repartidores SET
-                id_usuario = ?, id_estado_repartidor = ?, repartidor_codigo = ?, repartidor_placa = ?,
-                repartidor_tipo_vehiculo = ?, repartidor_calificacion = ?, repartidor_puntos = ?,
-                repartidor_posicion_ranking = ?, repartidor_total_pedidos = ?, repartidor_pedidos_aceptados = ?,
-                repartidor_pedidos_rechazados = ?, repartidor_pedidos_no_entregados = ?, repartidor_porcentaje_aceptacion = ?,
-                repartidor_horas_conectado = ?, repartidor_limite_billetera = ?, repartidor_confianza = ?,
-                repartidor_permite_telefono = ?, repartidor_fecha_ingreso = ?
+                id_usuario = ?, id_estado_repartidor = ?, repartidor_codigo = ?,
+                repartidor_placa = ?, repartidor_tipo_vehiculo = ?, repartidor_calificacion = ?,
+                repartidor_puntos = ?, repartidor_posicion_ranking = ?, repartidor_total_pedidos = ?,
+                repartidor_pedidos_aceptados = ?, repartidor_pedidos_rechazados = ?,
+                repartidor_pedidos_no_entregados = ?, repartidor_porcentaje_aceptacion = ?,
+                repartidor_horas_conectado = ?, repartidor_limite_billetera = ?,
+                repartidor_confianza = ?, repartidor_permite_telefono = ?, repartidor_fecha_ingreso = ?
             WHERE id_repartidor = ?
         `, [
-            id_usuario, id_estado_repartidor, repartidor_codigo, repartidor_placa, repartidor_tipo_vehiculo,
-            repartidor_calificacion, repartidor_puntos, repartidor_posicion_ranking, repartidor_total_pedidos,
-            repartidor_pedidos_aceptados, repartidor_pedidos_rechazados, repartidor_pedidos_no_entregados,
-            repartidor_porcentaje_aceptacion, repartidor_horas_conectado, repartidor_limite_billetera,
-            repartidor_confianza, repartidor_permite_telefono, repartidor_fecha_ingreso, id
+            id_usuario, id_estado_repartidor, repartidor_codigo, repartidor_placa,
+            repartidor_tipo_vehiculo, repartidor_calificacion, repartidor_puntos,
+            repartidor_posicion_ranking, repartidor_total_pedidos, repartidor_pedidos_aceptados,
+            repartidor_pedidos_rechazados, repartidor_pedidos_no_entregados,
+            repartidor_porcentaje_aceptacion, repartidor_horas_conectado,
+            repartidor_limite_billetera, repartidor_confianza, repartidor_permite_telefono,
+            repartidor_fecha_ingreso, id
         ]);
 
         if (result.affectedRows === 0) return res.status(404).json({ message: "Repartidor no encontrado" });
 
         const [rows] = await conmysql.query(`
-            SELECT r.*, er.estado_repartidor_nombre, er.estado_repartidor_descripcion,
-                   er.estado_repartidor_visible_front, er.estado_repartidor_permite_pedidos,
-                   er.estado_repartidor_permite_seleccion
+            SELECT r.*,
+                er.estado_repartidor_nombre,
+                er.estado_repartidor_descripcion,
+                er.estado_repartidor_visible_front,
+                er.estado_repartidor_permite_pedidos,
+                er.estado_repartidor_permite_seleccion
             FROM repartidores r
             LEFT JOIN estados_repartidor er ON r.id_estado_repartidor = er.id_estado_repartidor
             WHERE r.id_repartidor = ?
@@ -378,11 +420,14 @@ export const patchRepartidores = async (req, res) => {
             "id_usuario", "id_estado_repartidor", "repartidor_codigo", "repartidor_placa",
             "repartidor_tipo_vehiculo", "repartidor_calificacion", "repartidor_puntos",
             "repartidor_posicion_ranking", "repartidor_total_pedidos", "repartidor_pedidos_aceptados",
-            "repartidor_pedidos_rechazados", "repartidor_pedidos_no_entregados", "repartidor_porcentaje_aceptacion",
-            "repartidor_horas_conectado", "repartidor_limite_billetera", "repartidor_confianza",
-            "repartidor_permite_telefono", "repartidor_fecha_ingreso"
+            "repartidor_pedidos_rechazados", "repartidor_pedidos_no_entregados",
+            "repartidor_porcentaje_aceptacion", "repartidor_horas_conectado",
+            "repartidor_limite_billetera", "repartidor_confianza", "repartidor_permite_telefono",
+            "repartidor_fecha_ingreso"
         ];
-        const campos = [], valores = [];
+
+        const campos = [];
+        const valores = [];
 
         for (const campo of camposPermitidos) {
             if (req.body[campo] !== undefined) {
@@ -398,6 +443,7 @@ export const patchRepartidores = async (req, res) => {
                 SELECT id_estado_repartidor FROM estados_repartidor
                 WHERE id_estado_repartidor = ? AND estado_repartidor_estado = 1
             `, [req.body.id_estado_repartidor]);
+
             if (estado.length === 0) return res.status(400).json({ message: "El estado del repartidor no existe o está inactivo" });
         }
 
@@ -409,9 +455,12 @@ export const patchRepartidores = async (req, res) => {
         if (result.affectedRows === 0) return res.status(404).json({ message: "Repartidor no encontrado" });
 
         const [rows] = await conmysql.query(`
-            SELECT r.*, er.estado_repartidor_nombre, er.estado_repartidor_descripcion,
-                   er.estado_repartidor_visible_front, er.estado_repartidor_permite_pedidos,
-                   er.estado_repartidor_permite_seleccion
+            SELECT r.*,
+                er.estado_repartidor_nombre,
+                er.estado_repartidor_descripcion,
+                er.estado_repartidor_visible_front,
+                er.estado_repartidor_permite_pedidos,
+                er.estado_repartidor_permite_seleccion
             FROM repartidores r
             LEFT JOIN estados_repartidor er ON r.id_estado_repartidor = er.id_estado_repartidor
             WHERE r.id_repartidor = ?
@@ -431,6 +480,7 @@ export const deleteRepartidores = async (req, res) => {
         const [result] = await conmysql.query(`
             DELETE FROM repartidores WHERE id_repartidor = ?
         `, [id]);
+
         if (result.affectedRows === 0) return res.status(404).json({ message: "Repartidor no encontrado" });
         return res.status(204).send();
     } catch (error) {
