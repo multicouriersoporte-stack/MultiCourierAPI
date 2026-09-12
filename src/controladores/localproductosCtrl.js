@@ -43,11 +43,33 @@ export const getProductosPorLocal = async (req, res) => {
         console.log("ID LOCAL RECIBIDO:", id_local);
 
         const [result] = await conmysql.query(
-            `SELECT lp.*, l.local_latitud, l.local_longitud
-             FROM local_productos lp
-             INNER JOIN locales l ON l.id_local = lp.id_local
-             WHERE lp.id_local = ?
-             ORDER BY lp.local_producto_nombre ASC`,
+            `
+            SELECT
+                lp.*,
+
+                l.local_latitud,
+                l.local_longitud,
+
+                p.id_categoria_producto,
+                cp.categoria_producto_nombre
+
+            FROM local_productos lp
+
+            INNER JOIN locales l
+                ON l.id_local = lp.id_local
+
+            INNER JOIN productos p
+                ON p.id_producto = lp.id_producto
+
+            LEFT JOIN categorias_producto cp
+                ON cp.id_categoria_producto = p.id_categoria_producto
+
+            WHERE lp.id_local = ?
+
+            ORDER BY
+                cp.categoria_producto_nombre ASC,
+                lp.local_producto_nombre ASC
+            `,
             [id_local]
         );
 
@@ -66,7 +88,6 @@ export const getProductosPorLocal = async (req, res) => {
         });
     }
 };
-
 
 
 // Obtener productos por ID de producto
