@@ -39,20 +39,34 @@ export const getLocalProductoxid = async (req, res) => {
 export const getProductosPorLocal = async (req, res) => {
     try {
         const { id_local } = req.params;
-        // Obtiene productos del local junto con ubicación y categoría.
-        const [result] = await conmysql.query(`SELECT lp.*, l.local_latitud, l.local_longitud, p.id_categoria_producto, cp.categoria_producto_nombre
-            FROM local_productos lp
-            INNER JOIN locales l ON l.id_local = lp.id_local
-            INNER JOIN productos p ON p.id_producto = lp.id_producto
-            INNER JOIN categoria_productos cp ON cp.id_categoria_producto = p.id_categoria_producto
-            WHERE lp.id_local = ?
-            ORDER BY p.id_categoria_producto ASC, lp.local_producto_nombre ASC`, [id_local]);
+
+        console.log("ID LOCAL RECIBIDO:", id_local);
+
+        const [result] = await conmysql.query(
+            `SELECT lp.*, l.local_latitud, l.local_longitud
+             FROM local_productos lp
+             INNER JOIN locales l ON l.id_local = lp.id_local
+             WHERE lp.id_local = ?
+             ORDER BY lp.local_producto_nombre ASC`,
+            [id_local]
+        );
+
+        console.log("PRODUCTOS ENCONTRADOS:", result);
+
         return res.json(result);
+
     } catch (error) {
-        console.error("Error getProductosPorLocal:", error);
-        return res.status(500).json({ message: "Error al consultar productos del local", error: error.message });
+        console.error("ERROR REAL getProductosPorLocal:", error);
+
+        return res.status(500).json({
+            message: "Error al consultar productos del local",
+            error: error.message,
+            sqlMessage: error.sqlMessage,
+            code: error.code
+        });
     }
 };
+
 
 
 // Obtener productos por ID de producto
