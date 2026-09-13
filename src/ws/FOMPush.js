@@ -160,22 +160,26 @@ export const enviarPushNuevoPedidoMultiple = async ({ tokens, pedidoId, codigoPe
     });*/
 
 // Notificación para un nuevo pedido a un dispositivo.
+// Envía la notificación push para un nuevo pedido.
 export const enviarPushNuevoPedido = async ({ token, pedidoId, codigoPedido = "", nombreLocal = "" }) =>
-    enviarPush(token, {
-        titulo: "🛵 ¡Nuevo pedido!",
-        mensaje: codigoPedido ? `Tienes un nuevo pedido ${codigoPedido} pendiente.` : "Tienes un nuevo pedido pendiente.",
-        datos: { tipo: "nuevo_pedido", pedido_id: pedidoId, codigo_pedido: codigoPedido, local_nombre: nombreLocal },
-        sonido: "heylisten", // 🔊 Sonido personalizado Android/iOS.
-    });
+  enviarPush(token, {
+    titulo: "🛵 ¡Nuevo pedido!",
+    mensaje: codigoPedido ? `Tienes un nuevo pedido ${codigoPedido} pendiente.` : "Tienes un nuevo pedido pendiente.",
+    datos: { tipo: "nuevo_pedido", pedido_id: pedidoId, codigo_pedido: codigoPedido, local_nombre: nombreLocal },
+    sonido: "heylisten"
+  });
+
 
 // Notificación para un nuevo pedido a todos los dispositivos del local.
+// Envía la notificación push a múltiples dispositivos para un nuevo pedido.
 export const enviarPushNuevoPedidoMultiple = async ({ tokens, pedidoId, codigoPedido = "", nombreLocal = "" }) =>
-    enviarPushMultiple(tokens, {
-        titulo: "🛵 ¡Nuevo pedido!",
-        mensaje: codigoPedido ? `Tienes un nuevo pedido ${codigoPedido} pendiente.` : "Tienes un nuevo pedido pendiente.",
-        datos: { tipo: "nuevo_pedido", pedido_id: pedidoId, codigo_pedido: codigoPedido, local_nombre: nombreLocal },
-        sonido: "heylisten", // 🔊 Sonido personalizado Android/iOS.
-    });
+  enviarPushMultiple(tokens, {
+    titulo: "🛵 ¡Nuevo pedido!",
+    mensaje: codigoPedido ? `Tienes un nuevo pedido ${codigoPedido} pendiente.` : "Tienes un nuevo pedido pendiente.",
+    datos: { tipo: "nuevo_pedido", pedido_id: pedidoId, codigo_pedido: codigoPedido, local_nombre: nombreLocal },
+    sonido: "heylisten"
+  });
+
 
 // FCM exige que todos los valores de data sean strings.
 const normalizarData = (datos = {}) => {
@@ -190,7 +194,7 @@ const normalizarData = (datos = {}) => {
 };
 
 // Construye el mensaje común para Android e iOS.
-const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => ({
+/* const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => ({
     ...(token && { token }),
     notification: { title: String(titulo), body: String(mensaje) },
     data,
@@ -209,7 +213,30 @@ const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => ({
         headers: { "apns-priority": "10" },
         payload: { aps: { sound: sonido, badge: 1 } },
     },
+}); */
+
+const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => ({
+  ...(token && { token }),
+  notification: { title: String(titulo), body: String(mensaje) },
+  data,
+  android: {
+    priority: "high", // Prioridad alta para Android.
+    notification: {
+      channelId: "multicourier_pedidos_v2", // Debe coincidir con el canal de Capacitor.
+      sound: sonido || "heylisten", // Usa el recurso heylisten.mp3 sin extensión.
+      defaultSound: false,
+      defaultVibrateTimings: false,
+      vibrateTimingsMillis: [0, 500, 300, 500],
+      priority: "max",
+      visibility: "public"
+    }
+  },
+  apns: {
+    headers: { "apns-priority": "10" },
+    payload: { aps: { sound: sonido || "default", badge: 1, contentAvailable: true } }
+  }
 });
+
 
 // Detecta tokens FCM que Firebase ya no reconoce.
 const esTokenInvalido = error =>
