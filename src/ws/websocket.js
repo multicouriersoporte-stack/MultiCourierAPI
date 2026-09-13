@@ -1,3 +1,5 @@
+// src/ws/websocket.js
+
 const usuariosConectados = new Map();
 const repartidoresConectados = new Map();
 
