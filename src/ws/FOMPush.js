@@ -142,7 +142,7 @@ export const enviarPushMultiple = async (tokens, { titulo = "MultiCourier", mens
 };
 
 // Notificación específica para un nuevo pedido.
-export const enviarPushNuevoPedido = async ({ token, pedidoId, codigoPedido = "", nombreLocal = "" }) =>
+/*export const enviarPushNuevoPedido = async ({ token, pedidoId, codigoPedido = "", nombreLocal = "" }) =>
     enviarPush(token, {
         titulo: "🛵 ¡Nuevo pedido!",
         mensaje: codigoPedido ? `Tienes un nuevo pedido ${codigoPedido} pendiente.` : "Tienes un nuevo pedido pendiente.",
@@ -157,6 +157,24 @@ export const enviarPushNuevoPedidoMultiple = async ({ tokens, pedidoId, codigoPe
         mensaje: codigoPedido ? `Tienes un nuevo pedido ${codigoPedido} pendiente.` : "Tienes un nuevo pedido pendiente.",
         datos: { tipo: "nuevo_pedido", pedido_id: pedidoId, codigo_pedido: codigoPedido, local_nombre: nombreLocal },
         sonido: "default",
+    });*/
+
+// Notificación para un nuevo pedido a un dispositivo.
+export const enviarPushNuevoPedido = async ({ token, pedidoId, codigoPedido = "", nombreLocal = "" }) =>
+    enviarPush(token, {
+        titulo: "🛵 ¡Nuevo pedido!",
+        mensaje: codigoPedido ? `Tienes un nuevo pedido ${codigoPedido} pendiente.` : "Tienes un nuevo pedido pendiente.",
+        datos: { tipo: "nuevo_pedido", pedido_id: pedidoId, codigo_pedido: codigoPedido, local_nombre: nombreLocal },
+        sonido: "heylisten", // 🔊 Sonido personalizado Android/iOS.
+    });
+
+// Notificación para un nuevo pedido a todos los dispositivos del local.
+export const enviarPushNuevoPedidoMultiple = async ({ tokens, pedidoId, codigoPedido = "", nombreLocal = "" }) =>
+    enviarPushMultiple(tokens, {
+        titulo: "🛵 ¡Nuevo pedido!",
+        mensaje: codigoPedido ? `Tienes un nuevo pedido ${codigoPedido} pendiente.` : "Tienes un nuevo pedido pendiente.",
+        datos: { tipo: "nuevo_pedido", pedido_id: pedidoId, codigo_pedido: codigoPedido, local_nombre: nombreLocal },
+        sonido: "heylisten", // 🔊 Sonido personalizado Android/iOS.
     });
 
 // FCM exige que todos los valores de data sean strings.
