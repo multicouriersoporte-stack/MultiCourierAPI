@@ -1,4 +1,4 @@
-// src/ws/FOMPush.js
+// src/ws/FCMPush.js
 
 import admin from "firebase-admin";
 
