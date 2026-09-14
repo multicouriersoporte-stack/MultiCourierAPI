@@ -2372,7 +2372,7 @@ export const confirmarPagoPedido = async (req, res) => {
 };
 
 // Entregar pedido validando el PIN y generando los pagos.
-export const entregarPedidoConPin = async (req, res) => {
+/* export const entregarPedidoConPin = async (req, res) => {
   try {
     const { id } = req.params, { pedido_pin } = req.body;
     if (!esIdValido(id)) return res.status(400).json({ success: false, message: "ID no válido." });
@@ -2386,6 +2386,39 @@ export const entregarPedidoConPin = async (req, res) => {
 
     await conmysql.query(`UPDATE pedidos SET id_estado = ?, pedido_fecha_entrega = NOW() WHERE id_pedido = ?`, [idEstadoEntregado, id]);
     return res.json({ success: true, message: "Pedido entregado con éxito." });
+  } catch (error) {
+    console.error("[Pedidos] Error entregarPedidoConPin:", error);
+    return res.status(500).json({ success: false, message: "Error al entregar pedido." });
+  }
+}; */
+
+export const entregarPedidoConPin = async (req, res) => {
+  try {
+    const { id } = req.params, { pedido_pin } = req.body;
+    if (!esIdValido(id)) return res.status(400).json({ success: false, message: "ID no válido." });
+
+    const pedido = await obtenerPedidoPorIdInterno(id);
+    if (!pedido) return res.status(404).json({ success: false, message: "Pedido no encontrado." });
+
+    // Validar PIN y evitar reprocesar pedidos entregados.
+    if (String(pedido.pedido_pin).trim() !== String(pedido_pin).trim()) return res.status(400).json({ success: false, message: "El PIN de entrega es incorrecto." });
+
+    const idEstadoEntregado = await obtenerIdEstadoPorNombre("ENTREGADO", "PEDIDO");
+    if (!idEstadoEntregado) return res.status(500).json({ success: false, message: 'No existe el estado "ENTREGADO" para pedidos.' });
+    if (Number(pedido.id_estado) === Number(idEstadoEntregado)) return res.status(409).json({ success: false, message: "El pedido ya se encuentra ENTREGADO." });
+
+    // Marcar pedido como entregado.
+    await conmysql.query(`UPDATE pedidos SET id_estado = ?, pedido_fecha_entrega = NOW() WHERE id_pedido = ?`, [idEstadoEntregado, id]);
+
+    // Generar pagos asociados a la entrega sin bloquear la entrega si fallan.
+    let pagoLocal = null, pagoRepartidor = null;
+    try { pagoLocal = await crearPagoLocalDesdePedido(Number(id)); }
+    catch (error) { console.error("[Pedidos] Error creando pago local al entregar por PIN:", error); }
+    try { pagoRepartidor = await crearPagoRepartidorDesdePedido(Number(id)); }
+    catch (error) { console.error("[Pedidos] Error creando pago repartidor al entregar por PIN:", error); }
+
+    const pedidoActualizado = await obtenerPedidoPorIdInterno(id);
+    return res.json({ success: true, message: "Pedido entregado con éxito.", pedido: ocultarPedidoPin(pedidoActualizado, req), pago_local: pagoLocal, pago_repartidor: pagoRepartidor });
   } catch (error) {
     console.error("[Pedidos] Error entregarPedidoConPin:", error);
     return res.status(500).json({ success: false, message: "Error al entregar pedido." });
