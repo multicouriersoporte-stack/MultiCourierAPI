@@ -9,7 +9,7 @@ const PORCENTAJE_COMISION_LOCAL = 1;
  */
 export const getMisPagosLocales = async (req, res) => {
     try {
-        const idLocal = Number(req.usuario?.id_local); // ID del local asociado al usuario
+        const idLocal = Number(req.usuarios?.id_local); // ID del local asociado al usuario
 
         if (!Number.isInteger(idLocal) || idLocal <= 0)
             return res.status(403).json({ message: "El usuario autenticado no tiene un local asociado." });
