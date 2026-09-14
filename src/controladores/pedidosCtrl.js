@@ -2875,7 +2875,7 @@ export const confirmarPagoPedido = async (req, res) => {
 // ============================================================
 // ENTREGAR PEDIDO CON PIN
 // ============================================================
-/* export const entregarPedidoConPin = async (req, res) => {
+export const entregarPedidoConPin = async (req, res) => {
   try {
     const { id } = req.params;
     const { pedido_pin } = req.body;
@@ -2897,30 +2897,7 @@ export const confirmarPagoPedido = async (req, res) => {
     console.error("[Pedidos] Error entregarPedidoConPin:", error);
     return res.status(500).json({ success: false, message: "Error al entregar pedido." });
   }
-}; */
-
-export const entregarPedidoConPin = async (req, res) => {
-  try {
-    const { id } = req.params, { pedido_pin } = req.body;
-
-    // Validar ID y existencia del pedido
-    if (!esIdValido(id)) return res.status(400).json({ success: false, message: "ID no válido." });
-    const pedido = await obtenerPedidoPorIdInterno(id);
-    if (!pedido) return res.status(404).json({ success: false, message: "Pedido no encontrado." });
-
-    // Validar PIN de entrega
-    if (String(pedido.pedido_pin).trim() !== String(pedido_pin).trim())
-      return res.status(400).json({ success: false, message: "El PIN de entrega es incorrecto." });
-
-    // Obtener estado ENTREGADO
-    const idEstadoEntregado = await obtenerIdEstadoPorNombre("ENTREGADO", "PEDIDO");
-    if (!idEstadoEntregado)
-      return res.status(500).json({ success: false, message: 'No existe el estado "ENTREGADO" para pedidos.' });
-
-    await conmysql.query(
-      `UPDATE pedidos SET id_estado = ?, pedido_fecha_entrega = NOW() WHERE id_pedido = ?`,
-      [idEstadoEntregado, id]
-    );
+}; 
 
     // Generar pagos automáticamente
     let pagoLocal = null, pagoRepartidor = null;
