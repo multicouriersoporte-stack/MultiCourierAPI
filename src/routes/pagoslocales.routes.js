@@ -15,7 +15,7 @@ import { permitirRoles } from "../middlewares/roles.middleware.js";
 
 const router = Router();
 
-router.get("/pagoslocales/mis-pagos", verificarToken, permitirRoles("LOCAL"), getMisPagosLocales);
+router.get("/pagoslocales/mis-pagos", verificarToken, permitirRoles(..."LOCAL"), getMisPagosLocales);
 
 // Consultas: LOCAL, ADMINISTRADOR y CENTRAL.
 router.get("/pagoslocales", verificarToken, permitirRoles("LOCAL", "ADMINISTRADOR", "CENTRAL"), getPagosLocales);
