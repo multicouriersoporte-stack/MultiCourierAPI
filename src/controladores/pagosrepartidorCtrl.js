@@ -1,7 +1,7 @@
 import { conmysql } from "../db.js";
 
 // Comisión descontada de la carrera del repartidor.
-const PORCENTAJE_COMISION_REPARTIDOR = 5;
+const PORCENTAJE_COMISION_REPARTIDOR = 7.5;
 
 /**
  * Obtiene el ID del usuario autenticado.
