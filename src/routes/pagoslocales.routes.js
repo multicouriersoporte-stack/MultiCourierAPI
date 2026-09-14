@@ -1,6 +1,7 @@
 
 import { Router } from "express";
 import {
+    getMisPagosLocales,
     getPagosLocales,
     getPagosLocalesxid,
     getPagosLocalesPorLocal,
