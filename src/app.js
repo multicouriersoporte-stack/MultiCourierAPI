@@ -33,6 +33,9 @@ import usuariorolesRoutes from "./routes/usuarioroles.routes.js";
 import provinciasRoutes from "./routes/provincias.routes.js";
 import cantonesRoutes from "./routes/cantones.routes.js";
 
+import billeteraclienteRoutes from "./routes/billeteracliente.routes.js";
+import billeteraclientemovimientoRoutes from "./routes/billeteracliente_movimiento.routes.js";
+
 import { iniciarAsignacionAutomatica } from "./servicios/asignacionAutomatica.js";
 import buscarPedidosRoutes from "./routes/buscarPedidos.routes.js";
 
@@ -89,6 +92,9 @@ app.use("/api", rolesRoutes);
 app.use("/api", usuariorolesRoutes);
 app.use("/api", provinciasRoutes);
 app.use("/api", cantonesRoutes);
+
+app.use("/api", billeteraclienteRoutes);
+app.use("/api", billeteraclientemovimientoRoutes);
 
 app.use("/api", buscarPedidosRoutes);
 
