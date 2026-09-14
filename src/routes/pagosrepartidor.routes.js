@@ -1,31 +1,27 @@
-import { Router } from "express";
+import express from "express";
 import {
-    getPagosRepartidor,
-    getPagoRepartidorxid,
-    getPagosRepartidorPorRepartidor,
-    getPagosRepartidorPorPedido,
-    postPagosRepartidor,
-    putPagosRepartidor,
-    patchPagosRepartidor,
-    deletePagosRepartidor
-} from "../controladores/pagosrepartidorCtrl.js";
-import { verificarToken } from "../middlewares/auth.middleware.js";
-import { permitirRoles } from "../middlewares/roles.middleware.js";
+  postPagoRepartidor,
+  getPagoRepartidorPorPedido,
+  getMisPagosRepartidor,
+  actualizarEstadoPagoRepartidor,
+  getPagosRepartidores
+} from "../controllers/pagosrepartidorCtrl.js";
 
-const router = Router();
+const router = express.Router();
 
-// Consultas: repartidor, administrador y central.
-router.get("/pagosrepartidor", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagosRepartidor);
-router.get("/pagosrepartidor/repartidor/:id_repartidor", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagosRepartidorPorRepartidor);
-router.get("/pagosrepartidor/pedido/:id_pedido", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagosRepartidorPorPedido);
-router.get("/pagosrepartidor/:id", verificarToken, permitirRoles("REPARTIDOR", "ADMINISTRADOR", "CENTRAL"), getPagoRepartidorxid);
+// Listar todos los pagos.
+router.get("/", getPagosRepartidores);
 
-// Administración: crear y modificar pagos.
-router.post("/pagosrepartidor", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), postPagosRepartidor);
-router.put("/pagosrepartidor/:id", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), putPagosRepartidor);
-router.patch("/pagosrepartidor/:id", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), patchPagosRepartidor);
+// Pagos del repartidor autenticado. Debe ir antes de /:id.
+router.get("/mis-pagos", getMisPagosRepartidor);
 
-// Eliminación: solo administrador.
-router.delete("/pagosrepartidor/:id", verificarToken, permitirRoles("ADMINISTRADOR"), deletePagosRepartidor);
+// Consultar el pago de un pedido.
+router.get("/pedido/:id_pedido", getPagoRepartidorPorPedido);
+
+// Crear el pago de un pedido.
+router.post("/pedido/:id_pedido", postPagoRepartidor);
+
+// Actualizar el estado del pago.
+router.patch("/:id/estado", actualizarEstadoPagoRepartidor);
 
 export default router;
