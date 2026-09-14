@@ -5,7 +5,7 @@ import {
   getMisPagosRepartidor,
   actualizarEstadoPagoRepartidor,
   getPagosRepartidores
-} from "../controllers/pagosrepartidorCtrl.js";
+} from "../controladores/pagosrepartidorCtrl.js";
 
 const router = express.Router();
 
