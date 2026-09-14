@@ -2,10 +2,15 @@
 import { conmysql } from "../db.js";
 
 // Consultar billetera del usuario autenticado
+// Consultar billetera del usuario autenticado
 export const getBilleteraCliente = async (req, res) => {
     try {
-        const id_usuario = req.user.id_usuario;
-        const [result] = await conmysql.query(`SELECT id_billeteracliente, id_usuario, billeteracliente_saldo, billeteracliente_fecha_creacion, billeteracliente_fecha_actualizacion FROM billeteracliente WHERE id_usuario = ?`, [id_usuario]);
+        const id_usuario = req.usuario.id_usuario;   // ← aquí
+        const [result] = await conmysql.query(
+            `SELECT id_billeteracliente, id_usuario, billeteracliente_saldo, billeteracliente_fecha_creacion, billeteracliente_fecha_actualizacion 
+             FROM billeteracliente WHERE id_usuario = ?`, 
+            [id_usuario]
+        );
         if (result.length === 0) return res.status(404).json({ message: "No se encontró la billetera del cliente" });
         res.json(result[0]);
     } catch (error) {
