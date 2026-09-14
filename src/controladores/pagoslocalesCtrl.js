@@ -1,7 +1,7 @@
 import { conmysql } from "../db.js";
 
 // Comisión que se descuenta al local.
-const PORCENTAJE_COMISION_LOCAL = 5;
+const PORCENTAJE_COMISION_LOCAL = 1;
 
 /**
  * Crea el pago de un pedido cuando pasa a ENTREGADO (estado 15).
