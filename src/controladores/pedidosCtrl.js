@@ -1876,6 +1876,7 @@ const obtenerMetodoPagoPorId = async id_metodo_pago => {
   return rows.length ? rows[0] : null;
 };
 
+const esMetodoBilletera = metodoPago => Number(metodoPago?.id_metodo_pago) === 5;
 const esMetodoTransferencia = metodoPago => !!metodoPago && String(metodoPago.metodo_pago_nombre || "").trim().toUpperCase() === "TRANSFERENCIA";
 const obtenerPagoConfirmadoInicial = metodoPago => esMetodoTransferencia(metodoPago) ? 0 : 1;
 
@@ -2233,9 +2234,28 @@ export const postPedido = async (req, res) => {
     if (!metodoPago) throw new Error("El método de pago no existe.");
     if (Number(metodoPago.metodo_pago_estado) !== 1) throw new Error("El método de pago está inactivo.");
 
-    const pagoConfirmadoInicial = obtenerPagoConfirmadoInicial(metodoPago);
+    const esBilletera = esMetodoBilletera(metodoPago);
+    //const pagoConfirmadoInicial = obtenerPagoConfirmadoInicial(metodoPago);
     const esTransferencia = esMetodoTransferencia(metodoPago);
+    const pagoConfirmadoInicial = esTransferencia ? 0 : 1;
     const [ultimo] = await conexion.query(`SELECT pedido_codigo FROM pedidos ORDER BY id_pedido DESC LIMIT 1 FOR UPDATE`);
+
+    let billeteraCliente = null;
+    
+    if (esBilletera) {
+      // Bloquea la billetera para evitar modificaciones concurrentes.
+      const [billeteras] = await conexion.query(`SELECT id_billeteracliente, billeteracliente_saldo FROM billeteracliente WHERE id_usuario = ? LIMIT 1 FOR UPDATE`, [id_usuario]);
+    
+      if (!billeteras.length) throw new Error("El cliente no tiene una billetera registrada.");
+    
+      billeteraCliente = billeteras[0];
+      const saldo = Number(billeteraCliente.billeteracliente_saldo);
+      const totalPedido = Number(pedido_total ?? 0);
+    
+      // Valida que el pedido tenga un total válido y que exista saldo suficiente.
+      if (totalPedido <= 0) throw new Error("El total del pedido debe ser mayor a cero.");
+      if (saldo < totalPedido) throw new Error(`Saldo insuficiente en la billetera. Saldo disponible: ${saldo.toFixed(2)}`);
+    }
 
     let numero = 1;
     if (ultimo.length && ultimo[0].pedido_codigo) {
@@ -2279,6 +2299,28 @@ export const postPedido = async (req, res) => {
       detallesRegistrados.push({ id_pedido_detalle: detalleResult.insertId, id_local_producto, cantidad, subtotalApp });
     }
 
+    let movimientoBilletera = null;
+
+    if (esBilletera) {
+      const montoDebito = Number(pedido_total ?? 0);
+      const saldoAnterior = Number(billeteraCliente.billeteracliente_saldo);
+      const saldoNuevo = saldoAnterior - montoDebito;
+    
+      // Registra el débito y actualiza el saldo de la billetera.
+      const [movimientoResult] = await conexion.query(`INSERT INTO billeteracliente_movimiento (id_billeteracliente, billeteracliente_movimiento_tipo, billeteracliente_movimiento_monto, billeteracliente_movimiento_saldo_anterior, billeteracliente_movimiento_saldo_nuevo, billeteracliente_movimiento_concepto, billeteracliente_movimiento_referencia, id_pedido) VALUES (?, 'DEBITO', ?, ?, ?, ?, ?, ?)`, [billeteraCliente.id_billeteracliente, montoDebito, saldoAnterior, saldoNuevo, `Pago de pedido ${pedido_codigo}`, pedido_codigo, id_pedido]);
+    
+      await conexion.query(`UPDATE billeteracliente SET billeteracliente_saldo = ? WHERE id_billeteracliente = ?`, [saldoNuevo, billeteraCliente.id_billeteracliente]);
+    
+      movimientoBilletera = {
+        id_billeteracliente_movimiento: movimientoResult.insertId,
+        id_billeteracliente: billeteraCliente.id_billeteracliente,
+        tipo: "DEBITO",
+        monto: montoDebito,
+        saldo_anterior: saldoAnterior,
+        saldo_nuevo: saldoNuevo
+      };
+    }
+
     await conexion.commit(); transaccionIniciada = false;
     const pedidoFinal = await obtenerPedidoPorIdInterno(id_pedido);
     return res.status(201).json({
@@ -2286,7 +2328,9 @@ export const postPedido = async (req, res) => {
       id_estado: pedidoFinal?.id_estado ?? estadoInicial, estado_nombre: pedidoFinal?.estado_nombre ?? null,
       id_metodo_pago: pedidoFinal?.id_metodo_pago ?? id_metodo_pago, metodo_pago_nombre: pedidoFinal?.metodo_pago_nombre ?? null,
       pedido_pago_confirmado: Number(pedidoFinal?.pedido_pago_confirmado ?? pagoConfirmadoInicial),
-      message: esTransferencia ? "Pedido registrado. La transferencia queda pendiente de confirmación por SOPORTE o ADMINISTRADOR." : "Pedido registrado con éxito",
+      //message: esTransferencia ? "Pedido registrado. La transferencia queda pendiente de confirmación por SOPORTE o ADMINISTRADOR." : "Pedido registrado con éxito",
+      // Mensaje según el método de pago.
+      message: esTransferencia ? "Pedido registrado. La transferencia queda pendiente de confirmación por SOPORTE o ADMINISTRADOR." : esBilletera ? "Pedido registrado y pagado con Billetera." : "Pedido registrado con éxito",
       detalles: detallesRegistrados, pedido_pin
     });
   } catch (error) {
