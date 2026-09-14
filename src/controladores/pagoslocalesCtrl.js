@@ -9,35 +9,26 @@ const PORCENTAJE_COMISION_LOCAL = 1;
  */
 export const getMisPagosLocales = async (req, res) => {
     try {
-        console.log("[PagosLocales] Usuario autenticado:", req.usuario);
-        const idUsuario = Number(req.usuario?.id_usuario ?? req.usuario?.usuario_id ?? req.usuario?.idUsuario ?? req.usuario?.id ?? req.usuario?.usuarioId); // Obtiene el ID del usuario autenticado
+        if (!req.usuario)
+            return res.status(401).json({ success: false, message: "Usuario no autenticado." });
 
-        if (!Number.isInteger(idUsuario) || idUsuario <= 0)
-            return res.status(403).json({ success: false, message: "No se pudo identificar al usuario autenticado." });
+        const local = await obtenerLocalDelUsuario(req); // Obtiene el local asociado al usuario
 
-        console.log(`[PagosLocales] Buscando local asociado al usuario ${idUsuario}`);
-        const [locales] = await conmysql.query(
-            `SELECT id_local, id_usuario, local_codigo, local_nombre_comercial, local_razon_social FROM locales WHERE id_usuario = ? LIMIT 1`,
-            [idUsuario]
-        ); // Obtiene el local relacionado mediante locales.id_usuario
-
-        if (locales.length === 0)
+        if (!local)
             return res.status(403).json({ success: false, message: "El usuario autenticado no tiene un local asociado." });
 
-        const local = locales[0];
         const idLocal = Number(local.id_local);
 
         if (!Number.isInteger(idLocal) || idLocal <= 0)
             return res.status(403).json({ success: false, message: "El local asociado al usuario no es válido." });
 
-        console.log(`[PagosLocales] Usuario ${idUsuario} pertenece al local ${idLocal} (${local.local_nombre_comercial ?? "SIN NOMBRE"})`);
+        console.log(`[PagosLocales] Usuario ${req.usuario.id_usuario ?? req.usuario.id ?? "?"} pertenece al local ${idLocal}`);
 
         const [pagos] = await conmysql.query(
             `SELECT * FROM pagos_locales WHERE id_local = ? ORDER BY pago_local_fecha DESC, id_pago_local DESC`,
             [idLocal]
-        ); // Consulta únicamente los pagos del local asociado
+        ); // Consulta únicamente los pagos del local
 
-        console.log(`[PagosLocales] Se encontraron ${pagos.length} pagos para el local ${idLocal}`);
         return res.json(pagos);
     } catch (error) {
         console.error("[PagosLocales] Error getMisPagosLocales:", error);
