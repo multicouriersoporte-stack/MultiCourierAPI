@@ -3,9 +3,8 @@ import { conmysql } from "../db.js";
 // Consultar movimientos de la billetera del usuario autenticado
 export const getMovimientosBilleteraCliente = async (req, res) => {
     try {
-        const id_usuario = req.user.id_usuario;
+        const id_usuario = req.usuario.id_usuario;   // ← aquí
 
-        // Obtener id_billeteracliente del usuario
         const [billetera] = await conmysql.query(
             `SELECT id_billeteracliente FROM billeteracliente WHERE id_usuario = ?`,
             [id_usuario]
@@ -19,19 +18,19 @@ export const getMovimientosBilleteraCliente = async (req, res) => {
 
         const [result] = await conmysql.query(
             `SELECT 
-         id_billeteracliente_movimiento,
-         id_billeteracliente,
-         billeteracliente_movimiento_tipo,
-         billeteracliente_movimiento_monto,
-         billeteracliente_movimiento_saldo_anterior,
-         billeteracliente_movimiento_saldo_nuevo,
-         billeteracliente_movimiento_concepto,
-         billeteracliente_movimiento_referencia,
-         id_pedido,
-         billeteracliente_movimiento_fecha
-       FROM billeteracliente_movimiento
-       WHERE id_billeteracliente = ?
-       ORDER BY billeteracliente_movimiento_fecha DESC, id_billeteracliente_movimiento DESC`,
+                id_billeteracliente_movimiento,
+                id_billeteracliente,
+                billeteracliente_movimiento_tipo,
+                billeteracliente_movimiento_monto,
+                billeteracliente_movimiento_saldo_anterior,
+                billeteracliente_movimiento_saldo_nuevo,
+                billeteracliente_movimiento_concepto,
+                billeteracliente_movimiento_referencia,
+                id_pedido,
+                billeteracliente_movimiento_fecha
+             FROM billeteracliente_movimiento
+             WHERE id_billeteracliente = ?
+             ORDER BY billeteracliente_movimiento_fecha DESC, id_billeteracliente_movimiento DESC`,
             [id_billeteracliente]
         );
 
