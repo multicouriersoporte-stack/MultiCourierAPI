@@ -37,6 +37,7 @@ export const getMisPagosLocales = async (req, res) => {
 };
 
 
+
 /**
  * Crea el pago de un pedido cuando pasa a ENTREGADO (estado 15).
  * Es idempotente: no duplica pagos existentes.
