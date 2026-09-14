@@ -2875,7 +2875,7 @@ export const confirmarPagoPedido = async (req, res) => {
 // ============================================================
 // ENTREGAR PEDIDO CON PIN
 // ============================================================
-export const entregarPedidoConPin = async (req, res) => {
+/* export const entregarPedidoConPin = async (req, res) => {
   try {
     const { id } = req.params;
     const { pedido_pin } = req.body;
@@ -2897,7 +2897,66 @@ export const entregarPedidoConPin = async (req, res) => {
     console.error("[Pedidos] Error entregarPedidoConPin:", error);
     return res.status(500).json({ success: false, message: "Error al entregar pedido." });
   }
+}; */
+
+export const entregarPedidoConPin = async (req, res) => {
+  try {
+    const { id } = req.params, { pedido_pin } = req.body;
+
+    // Validar ID y existencia del pedido
+    if (!esIdValido(id)) return res.status(400).json({ success: false, message: "ID no válido." });
+    const pedido = await obtenerPedidoPorIdInterno(id);
+    if (!pedido) return res.status(404).json({ success: false, message: "Pedido no encontrado." });
+
+    // Validar PIN de entrega
+    if (String(pedido.pedido_pin).trim() !== String(pedido_pin).trim())
+      return res.status(400).json({ success: false, message: "El PIN de entrega es incorrecto." });
+
+    // Obtener estado ENTREGADO
+    const idEstadoEntregado = await obtenerIdEstadoPorNombre("ENTREGADO", "PEDIDO");
+    if (!idEstadoEntregado)
+      return res.status(500).json({ success: false, message: 'No existe el estado "ENTREGADO" para pedidos.' });
+
+    await conmysql.query(
+      `UPDATE pedidos SET id_estado = ?, pedido_fecha_entrega = NOW() WHERE id_pedido = ?`,
+      [idEstadoEntregado, id]
+    );
+
+    // Generar pagos automáticamente
+    let pagoLocal = null, pagoRepartidor = null;
+    try {
+      pagoLocal = await crearPagoLocalDesdePedido(Number(id));
+      pagoRepartidor = await crearPagoRepartidorDesdePedido(Number(id));
+    } catch (error) {
+      console.error("[Pedidos] Error creando pagos después de entregar:", error);
+      return res.status(500).json({
+        success: false,
+        message: "El pedido fue entregado, pero ocurrió un error al generar los pagos.",
+        error: error.message
+      });
+    }
+
+    return res.json({ success: true, message: "Pedido entregado con éxito.", pago_local: pagoLocal, pago_repartidor: pagoRepartidor });
+  } catch (error) {
+    console.error("[Pedidos] Error entregarPedidoConPin:", error);
+    return res.status(500).json({ success: false, message: "Error al entregar pedido." });
+  }
 };
+
+const idEstadoEntregado = await obtenerIdEstadoPorNombre(
+    "ENTREGADO",
+    "PEDIDO"
+);
+
+if (!idEstadoEntregado) {
+    throw new Error('No existe el estado "ENTREGADO".');
+}
+
+if (Number(pedido.id_estado) !== Number(idEstadoEntregado)) {
+    throw new Error(
+        `El pago local solo puede generarse cuando el pedido está ENTREGADO. Estado actual: ${pedido.id_estado}`
+    );
+}
 
 // ============================================================
 // ELIMINAR PEDIDO
