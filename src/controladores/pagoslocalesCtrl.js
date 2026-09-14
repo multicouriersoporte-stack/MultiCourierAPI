@@ -4,6 +4,31 @@ import { conmysql } from "../db.js";
 const PORCENTAJE_COMISION_LOCAL = 1;
 
 /**
+ * Obtiene únicamente los pagos del local del usuario autenticado.
+ * El id_local se obtiene mediante verificarToken.
+ */
+export const getMisPagosLocales = async (req, res) => {
+    try {
+        const idLocal = Number(req.usuario?.id_local); // ID del local asociado al usuario
+
+        if (!Number.isInteger(idLocal) || idLocal <= 0)
+            return res.status(403).json({ message: "El usuario autenticado no tiene un local asociado." });
+
+        const [result] = await conmysql.query(
+            `SELECT * FROM pagos_locales
+             WHERE id_local = ?
+             ORDER BY pago_local_fecha DESC, id_pago_local DESC`,
+            [idLocal]
+        );
+
+        return res.json(result); // Devuelve únicamente los pagos del local autenticado
+    } catch (error) {
+        console.error("Error getMisPagosLocales:", error);
+        return res.status(500).json({ message: "Error al consultar los pagos del local", error: error.message });
+    }
+};
+
+/**
  * Crea el pago de un pedido cuando pasa a ENTREGADO (estado 15).
  * Es idempotente: no duplica pagos existentes.
  */
