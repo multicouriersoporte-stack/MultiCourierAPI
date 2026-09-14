@@ -9,24 +9,39 @@ const PORCENTAJE_COMISION_LOCAL = 1;
  */
 export const getMisPagosLocales = async (req, res) => {
     try {
-        const idLocal = Number(req.usuarios?.id_local); // ID del local asociado al usuario
+        console.log("[PagosLocales] Usuario autenticado:", req.usuario);
+        const idUsuario = Number(req.usuario?.id_usuario ?? req.usuario?.id ?? req.usuario?.usuario_id); // Obtiene el ID del usuario autenticado
+
+        if (!Number.isInteger(idUsuario) || idUsuario <= 0)
+            return res.status(403).json({ message: "No se pudo identificar al usuario autenticado.", usuario: req.usuario ?? null });
+
+        const [usuarios] = await conmysql.query(
+            `SELECT id_usuario, id_local FROM usuarios WHERE id_usuario = ? LIMIT 1`,
+            [idUsuario]
+        ); // Obtiene el local asociado al usuario
+
+        if (usuarios.length === 0)
+            return res.status(403).json({ message: "El usuario autenticado no existe." });
+
+        const idLocal = Number(usuarios[0].id_local);
 
         if (!Number.isInteger(idLocal) || idLocal <= 0)
             return res.status(403).json({ message: "El usuario autenticado no tiene un local asociado." });
 
-        const [result] = await conmysql.query(
-            `SELECT * FROM pagos_locales
-             WHERE id_local = ?
-             ORDER BY pago_local_fecha DESC, id_pago_local DESC`,
-            [idLocal]
-        );
+        console.log(`[PagosLocales] Usuario ${idUsuario} pertenece al local ${idLocal}`);
 
-        return res.json(result); // Devuelve únicamente los pagos del local autenticado
+        const [pagos] = await conmysql.query(
+            `SELECT * FROM pagos_locales WHERE id_local = ? ORDER BY pago_local_fecha DESC, id_pago_local DESC`,
+            [idLocal]
+        ); // Consulta únicamente los pagos del local
+
+        return res.json(pagos);
     } catch (error) {
         console.error("Error getMisPagosLocales:", error);
         return res.status(500).json({ message: "Error al consultar los pagos del local", error: error.message });
     }
 };
+
 
 /**
  * Crea el pago de un pedido cuando pasa a ENTREGADO (estado 15).
