@@ -1,4 +1,4 @@
-import express from "express";
+import { Router } from "express";
 import {
   postPagoRepartidor,
   getPagoRepartidorPorPedido,
@@ -6,22 +6,24 @@ import {
   actualizarEstadoPagoRepartidor,
   getPagosRepartidores
 } from "../controladores/pagosrepartidorCtrl.js";
+import { verificarToken } from "../middlewares/auth.middleware.js";
+import { permitirRoles } from "../middlewares/roles.middleware.js";
 
-const router = express.Router();
+const router = Router();
 
-// Listar todos los pagos.
-router.get("/", getPagosRepartidores);
+// Listar todos (administrativo)
+router.get("/", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR", "CENTRAL", "SUPERVISOR"), getPagosRepartidores);
 
-// Pagos del repartidor autenticado. Debe ir antes de /:id.
-router.get("/mis-pagos", getMisPagosRepartidor);
+// Pagos del repartidor autenticado
+router.get("/mis-pagos", verificarToken, permitirRoles("REPARTIDOR"), getMisPagosRepartidor);
 
-// Consultar el pago de un pedido.
-router.get("/pedido/:id_pedido", getPagoRepartidorPorPedido);
+// Consultar pago de un pedido
+router.get("/pedido/:id_pedido", verificarToken, permitirRoles("REPARTIDOR", "SOPORTE", "ADMINISTRADOR", "CENTRAL", "SUPERVISOR"), getPagoRepartidorPorPedido);
 
-// Crear el pago de un pedido.
-router.post("/pedido/:id_pedido", postPagoRepartidor);
+// Crear pago manualmente
+router.post("/pedido/:id_pedido", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), postPagoRepartidor);
 
-// Actualizar el estado del pago.
-router.patch("/:id/estado", actualizarEstadoPagoRepartidor);
+// Actualizar estado
+router.patch("/:id/estado", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), actualizarEstadoPagoRepartidor);
 
 export default router;
