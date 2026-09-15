@@ -12,18 +12,18 @@ import { permitirRoles } from "../middlewares/roles.middleware.js";
 const router = Router();
 
 // Listar todos (administrativo)
-router.get("/", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR", "CENTRAL", "SUPERVISOR"), getPagosRepartidores);
+router.get("/pagosrepartidores", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR", "CENTRAL", "SUPERVISOR"), getPagosRepartidores);
 
 // Pagos del repartidor autenticado
-router.get("/mis-pagos", verificarToken, permitirRoles("REPARTIDOR"), getMisPagosRepartidor);
+router.get("/pagosrepartidores/mis-pagos", verificarToken, permitirRoles("REPARTIDOR"), getMisPagosRepartidor);
 
 // Consultar pago de un pedido
-router.get("/pedido/:id_pedido", verificarToken, permitirRoles("REPARTIDOR", "SOPORTE", "ADMINISTRADOR", "CENTRAL", "SUPERVISOR"), getPagoRepartidorPorPedido);
+router.get("/pagosrepartidores/pedido/:id_pedido", verificarToken, permitirRoles("REPARTIDOR", "SOPORTE", "ADMINISTRADOR", "CENTRAL", "SUPERVISOR"), getPagoRepartidorPorPedido);
 
 // Crear pago manualmente
-router.post("/pedido/:id_pedido", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), postPagoRepartidor);
+router.post("/pagosrepartidores/pedido/:id_pedido", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), postPagoRepartidor);
 
 // Actualizar estado
-router.patch("/:id/estado", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), actualizarEstadoPagoRepartidor);
+router.patch("/pagosrepartidores/:id/estado", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), actualizarEstadoPagoRepartidor);
 
 export default router;
