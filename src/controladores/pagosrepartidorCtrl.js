@@ -339,7 +339,7 @@ export const getMisPagosRepartidor = async (req, res) => {
              INNER JOIN pedidos p ON pr.id_pedido = p.id_pedido
              LEFT JOIN locales l ON p.id_local = l.id_local
              WHERE pr.id_repartidor = ?
-             ORDER BY pr.id_pago_repartidores DESC`,
+             ORDER BY pr.id_pago_repartidor DESC`,
             [idRepartidor]
         );
 
@@ -398,12 +398,12 @@ export const actualizarEstadoPagoRepartidor = async (req, res) => {
     await conmysql.query(`
       UPDATE pagos_repartidor
       SET pago_repartidor_estado = ?
-      WHERE id_pago_repartidores = ?
+      WHERE id_pago_repartidor = ?
     `, [nuevoEstado, id]);
 
     const [actualizado] = await conmysql.query(`
       SELECT * FROM pagos_repartidor
-      WHERE id_pago_repartidores = ?
+      WHERE id_pago_repartidor = ?
       LIMIT 1
     `, [id]);
 
