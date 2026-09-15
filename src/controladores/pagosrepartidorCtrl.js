@@ -62,7 +62,7 @@ const obtenerPedidoParaPago = async (conexion, id_pedido, bloquear = false) => {
 const obtenerPagoExistente = async (conexion, id_pedido, bloquear = false) => {
   const lock = bloquear ? " FOR UPDATE" : "";
   const [rows] = await conexion.query(`
-    SELECT * FROM pagos_repartidores
+    SELECT * FROM pagos_repartidor
     WHERE id_pedido = ?
     LIMIT 1
     ${lock}
@@ -142,7 +142,7 @@ export const crearPagoRepartidorDesdePedido = async (id_pedido, conexionExterna 
 
     // Insertar pago
     const [resultado] = await conexion.query(`
-      INSERT INTO pagos_repartidores (
+      INSERT INTO pagos_repartidor (
         id_pedido,
         id_repartidor,
         pago_repartidor_monto,
@@ -156,13 +156,13 @@ export const crearPagoRepartidorDesdePedido = async (id_pedido, conexionExterna 
     }
 
     const [pagoCreado] = await conexion.query(`
-      SELECT * FROM pagos_repartidores
-      WHERE id_pagos_repartidores = ?
+      SELECT * FROM pagos_repartidor
+      WHERE id_pago_repartidor = ?
       LIMIT 1
     `, [resultado.insertId]);
 
     console.log("[PagosRepartidor] Pago creado automáticamente:", {
-      id_pagos_repartidores: resultado.insertId,
+      id_pago_repartidor: resultado.insertId,
       id_pedido: pedido.id_pedido,
       id_repartidor: pedido.id_repartidor,
       carrera,
@@ -178,7 +178,7 @@ export const crearPagoRepartidorDesdePedido = async (id_pedido, conexionExterna 
       success: true,
       mensaje: "Pago del repartidor creado correctamente.",
       pago: pagoCreado[0] || {
-        id_pagos_repartidores: resultado.insertId,
+        id_pago_repartidor: resultado.insertId,
         id_pedido: idPedido,
         id_repartidor: pedido.id_repartidor,
         pago_repartidor_monto: montoRepartidor,
@@ -259,7 +259,7 @@ export const getPagoRepartidorPorPedido = async (req, res) => {
         r.repartidor_codigo,
         u.usuario_nombre, u.usuario_apellido, u.usuario_nombre_completo,
         r.id_usuario AS repartidor_id_usuario
-      FROM pagos_repartidores pr
+      FROM pagos_repartidor pr
       INNER JOIN pedidos p ON pr.id_pedido = p.id_pedido
       LEFT JOIN repartidores r ON pr.id_repartidor = r.id_repartidor
       LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario
@@ -335,11 +335,11 @@ export const getMisPagosRepartidor = async (req, res) => {
         // Consultar únicamente los pagos del repartidor autenticado.
         const [pagos] = await conmysql.query(
             `SELECT pr.*, p.pedido_codigo, p.pedido_fecha, p.pedido_fecha_entrega, p.pedido_carrera, p.pedido_propina, l.local_nombre_comercial
-             FROM pagos_repartidores pr
+             FROM pagos_repartidor pr
              INNER JOIN pedidos p ON pr.id_pedido = p.id_pedido
              LEFT JOIN locales l ON p.id_local = l.id_local
              WHERE pr.id_repartidor = ?
-             ORDER BY pr.id_pagos_repartidores DESC`,
+             ORDER BY pr.id_pago_repartidores DESC`,
             [idRepartidor]
         );
 
@@ -386,8 +386,8 @@ export const actualizarEstadoPagoRepartidor = async (req, res) => {
     }
 
     const [existente] = await conmysql.query(`
-      SELECT * FROM pagos_repartidores
-      WHERE id_pagos_repartidores = ?
+      SELECT * FROM pagos_repartidor
+      WHERE id_pago_repartidor = ?
       LIMIT 1
     `, [id]);
 
@@ -396,14 +396,14 @@ export const actualizarEstadoPagoRepartidor = async (req, res) => {
     }
 
     await conmysql.query(`
-      UPDATE pagos_repartidores
+      UPDATE pagos_repartidor
       SET pago_repartidor_estado = ?
-      WHERE id_pagos_repartidores = ?
+      WHERE id_pago_repartidores = ?
     `, [nuevoEstado, id]);
 
     const [actualizado] = await conmysql.query(`
-      SELECT * FROM pagos_repartidores
-      WHERE id_pagos_repartidores = ?
+      SELECT * FROM pagos_repartidor
+      WHERE id_pago_repartidores = ?
       LIMIT 1
     `, [id]);
 
@@ -443,11 +443,11 @@ export const getPagosRepartidores = async (req, res) => {
         p.pedido_total, p.pedido_carrera, p.pedido_propina,
         r.repartidor_codigo, r.id_usuario AS repartidor_id_usuario,
         u.usuario_nombre, u.usuario_apellido, u.usuario_nombre_completo
-      FROM pagos_repartidores pr
+      FROM pagos_repartidor pr
       INNER JOIN pedidos p ON pr.id_pedido = p.id_pedido
       INNER JOIN repartidores r ON pr.id_repartidor = r.id_repartidor
       LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario
-      ORDER BY pr.id_pagos_repartidores DESC
+      ORDER BY pr.id_pago_repartidor DESC
     `);
 
     return res.json({ success: true, pagos });
