@@ -306,62 +306,52 @@ export const getPagoRepartidorPorPedido = async (req, res) => {
  * Lista los pagos del repartidor autenticado.
  */
 export const getMisPagosRepartidor = async (req, res) => {
-  try {
-    if (!req.usuario) {
-      return res.status(401).json({ success: false, message: "Usuario no autenticado." });
+    try {
+        console.log("[PagosRepartidor] Usuario autenticado:", req.usuario);
+
+        // Validar autenticación y rol.
+        if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
+        if (!tieneRol(req, ["REPARTIDOR"])) return res.status(403).json({ success: false, message: "Esta ruta solamente está disponible para repartidores." });
+
+        // Obtener y validar el ID del usuario autenticado.
+        const idUsuario = Number(req.usuario?.id_usuario ?? req.usuario?.usuario_id ?? req.usuario?.idUsuario ?? req.usuario?.id ?? req.usuario?.usuarioId);
+        if (!Number.isInteger(idUsuario) || idUsuario <= 0) return res.status(403).json({ success: false, message: "No se pudo identificar al usuario autenticado." });
+
+        console.log(`[PagosRepartidor] Buscando repartidor asociado al usuario ${idUsuario}`);
+
+        // Buscar el repartidor asociado al usuario.
+        const [repartidores] = await conmysql.query(
+            `SELECT id_repartidor, id_usuario FROM repartidores WHERE id_usuario = ? LIMIT 1`,
+            [idUsuario]
+        );
+
+        if (repartidores.length === 0) return res.status(403).json({ success: false, message: "El usuario autenticado no tiene un repartidor asociado." });
+
+        const idRepartidor = Number(repartidores[0].id_repartidor);
+        if (!Number.isInteger(idRepartidor) || idRepartidor <= 0) return res.status(403).json({ success: false, message: "El repartidor asociado al usuario no es válido." });
+
+        console.log(`[PagosRepartidor] Usuario ${idUsuario} pertenece al repartidor ${idRepartidor}`);
+
+        // Consultar únicamente los pagos del repartidor autenticado.
+        const [pagos] = await conmysql.query(
+            `SELECT pr.*, p.pedido_codigo, p.pedido_fecha, p.pedido_fecha_entrega, p.pedido_carrera, p.pedido_propina, l.local_nombre_comercial
+             FROM pagos_repartidores pr
+             INNER JOIN pedidos p ON pr.id_pedido = p.id_pedido
+             LEFT JOIN locales l ON p.id_local = l.id_local
+             WHERE pr.id_repartidor = ?
+             ORDER BY pr.id_pagos_repartidores DESC`,
+            [idRepartidor]
+        );
+
+        console.log(`[PagosRepartidor] Se encontraron ${pagos.length} pagos para el repartidor ${idRepartidor}`);
+
+        return res.json({ success: true, id_repartidor: idRepartidor, pagos });
+    } catch (error) {
+        console.error("[PagosRepartidor] Error getMisPagosRepartidor:", error);
+        return res.status(500).json({ success: false, message: "Error al consultar los pagos del repartidor.", error: error.message });
     }
-    if (!tieneRol(req, ["REPARTIDOR"])) {
-      return res.status(403).json({
-        success: false,
-        message: "Esta ruta solamente está disponible para repartidores."
-      });
-    }
-
-    const id_usuario = obtenerIdUsuario(req);
-    if (!id_usuario) {
-      return res.status(401).json({
-        success: false,
-        message: "No se pudo identificar al usuario autenticado."
-      });
-    }
-
-    const [repartidores] = await conmysql.query(`
-      SELECT id_repartidor FROM repartidores
-      WHERE id_usuario = ?
-      LIMIT 1
-    `, [id_usuario]);
-
-    if (!repartidores.length) {
-      return res.status(403).json({
-        success: false,
-        message: "El usuario no tiene un repartidor asociado."
-      });
-    }
-
-    const id_repartidor = repartidores[0].id_repartidor;
-
-    const [pagos] = await conmysql.query(`
-      SELECT 
-        pr.*, 
-        p.pedido_codigo, p.pedido_fecha, p.pedido_fecha_entrega,
-        p.pedido_carrera, p.pedido_propina,
-        l.local_nombre_comercial
-      FROM pagos_repartidores pr
-      INNER JOIN pedidos p ON pr.id_pedido = p.id_pedido
-      LEFT JOIN locales l ON p.id_local = l.id_local
-      WHERE pr.id_repartidor = ?
-      ORDER BY pr.id_pagos_repartidores DESC
-    `, [id_repartidor]);
-
-    return res.json({ success: true, id_repartidor, pagos });
-  } catch (error) {
-    console.error("[PagosRepartidor] Error getMisPagosRepartidor:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Error al consultar los pagos del repartidor."
-    });
-  }
 };
+
 
 /**
  * Actualiza el estado de un pago.
