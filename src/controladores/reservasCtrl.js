@@ -1,4 +1,9 @@
-const reservasService = require('../servicios/Reservas.service');
+//const reservasService = require('../servicios/Reservas.service');
+import {
+    solicitarReserva,
+    consultarSolicitud,
+    soltarHoras
+} from '../servicios/Reservas.service.js';
 
 const ERRORES_HTTP = {
     NO_EXISTE: 404,
