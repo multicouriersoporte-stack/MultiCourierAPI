@@ -3,7 +3,7 @@ import cron from "node-cron";
 import {
     generarHorariosSemana,
     limpiarSemanaAnterior
-} from "./horarios.generacion.service.js";
+} from "./Horarios.generacion.service.js";
 
 function siguienteLunes(desde = new Date()) {
     const fecha = new Date(desde);
