@@ -1,4 +1,3 @@
-//const intercambiosService = require('../servicios/Intercambios.service');
 import {
     ofrecerIntercambio,
     listarOfertasDisponibles,
@@ -13,6 +12,9 @@ const ERRORES_HTTP = {
     NO_DISPONIBLE: 409,
     RESERVA_INVALIDA: 409,
     CHOQUE_HORARIO: 409,
+    INTERCAMBIO_INVALIDO: 409,
+    RESERVAS_NO_ENCONTRADAS: 404,
+    HORARIOS_NO_ENCONTRADOS: 404,
 };
 
 function manejarError(res, error) {
@@ -25,7 +27,6 @@ async function ofrecer(req, res) {
     try {
         const idRepartidor = req.usuario.id_repartidor; // TODO: ajustar al middleware de auth real
         const { id } = req.params; // id_reserva
-        //const resultado = await intercambiosService.ofrecerIntercambio(Number(id), idRepartidor);
         const resultado = await ofrecerIntercambio(Number(id), idRepartidor);
         res.status(201).json(resultado);
     } catch (error) { manejarError(res, error); }
@@ -33,7 +34,7 @@ async function ofrecer(req, res) {
 
 async function listarOfertas(req, res) {
     try {
-        const ofertas = await intercambiosService.listarOfertasDisponibles();
+        const ofertas = await listarOfertasDisponibles();
         res.json(ofertas);
     } catch (error) { manejarError(res, error); }
 }
@@ -43,7 +44,7 @@ async function solicitar(req, res) {
         const idRepartidor = req.usuario.id_repartidor;
         const { id } = req.params; // id_intercambio
         const { id_reserva_propia } = req.body;
-        const resultado = await intercambiosService.solicitarIntercambio(Number(id), Number(id_reserva_propia), idRepartidor);
+        const resultado = await solicitarIntercambio(Number(id), Number(id_reserva_propia), idRepartidor);
         res.json(resultado);
     } catch (error) { manejarError(res, error); }
 }
@@ -52,7 +53,7 @@ async function aceptar(req, res) {
     try {
         const idRepartidor = req.usuario.id_repartidor;
         const { id } = req.params;
-        const resultado = await intercambiosService.aceptarIntercambio(Number(id), idRepartidor);
+        const resultado = await aceptarIntercambio(Number(id), idRepartidor);
         res.json(resultado);
     } catch (error) { manejarError(res, error); }
 }
@@ -61,12 +62,11 @@ async function rechazar(req, res) {
     try {
         const idRepartidor = req.usuario.id_repartidor;
         const { id } = req.params;
-        const resultado = await intercambiosService.rechazarIntercambio(Number(id), idRepartidor);
+        const resultado = await rechazarIntercambio(Number(id), idRepartidor);
         res.json(resultado);
     } catch (error) { manejarError(res, error); }
 }
 
-//module.exports = { ofrecer, listarOfertas, solicitar, aceptar, rechazar };
 export {
     ofrecer,
     listarOfertas,
