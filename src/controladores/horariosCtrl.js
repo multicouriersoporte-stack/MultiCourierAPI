@@ -1,40 +1,41 @@
-const consultaService = require('../servicios/Horarios.consulta.service');
+import * as consultaService from "../servicios/horarios.consulta.service.js";
 
-async function listarDisponibles(req, res) {
+export const listarDisponibles = async (req, res) => {
     try {
         const { fecha } = req.query;
-        if (!fecha) return res.status(400).json({ error: 'Falta el parámetro fecha' });
+        if (!fecha) return res.status(400).json({ error: "Falta el parámetro fecha" });
         const disponibles = await consultaService.obtenerDisponiblesPorFecha(fecha);
         res.json(disponibles);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Error al listar horarios disponibles' });
+        res.status(500).json({ error: "Error al listar horarios disponibles" });
     }
-}
+};
 
-async function listarMisHoras(req, res) {
+export const listarMisHoras = async (req, res) => {
     try {
         const { fecha } = req.query;
-        const idRepartidor = req.usuario.id_repartidor; // TODO: ajustar al middleware de auth real
-        if (!fecha) return res.status(400).json({ error: 'Falta el parámetro fecha' });
+        // Ajusta según tu middleware de auth (ej. req.usuario.id_repartidor)
+        const idRepartidor = req.usuario?.id_repartidor;
+        if (!fecha) return res.status(400).json({ error: "Falta el parámetro fecha" });
+        if (!idRepartidor) return res.status(401).json({ error: "No autenticado como repartidor" });
         const misHoras = await consultaService.obtenerMisHorasPorFecha(idRepartidor, fecha);
         res.json(misHoras);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Error al listar mis horas' });
+        res.status(500).json({ error: "Error al listar mis horas" });
     }
-}
+};
 
-async function listarHistorial(req, res) {
+export const listarHistorial = async (req, res) => {
     try {
-        const idRepartidor = req.usuario.id_repartidor;
+        const idRepartidor = req.usuario?.id_repartidor;
         const { desde, hasta } = req.query;
+        if (!idRepartidor) return res.status(401).json({ error: "No autenticado como repartidor" });
         const historial = await consultaService.obtenerHistorial(idRepartidor, { desde, hasta });
         res.json(historial);
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: 'Error al listar historial' });
+        res.status(500).json({ error: "Error al listar historial" });
     }
-}
-
-module.exports = { listarDisponibles, listarMisHoras, listarHistorial };
+};
