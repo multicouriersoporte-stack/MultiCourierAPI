@@ -24,7 +24,8 @@ async function solicitarReserva(req, res) {
     try {
         const idRepartidor = req.usuario.id_repartidor; // TODO: ajustar al middleware de auth real
         const { id } = req.params; // id_horario_disponible
-        const resultado = await reservasService.solicitarReserva(Number(id), idRepartidor);
+        //const resultado = await reservasService.solicitarReserva(Number(id), idRepartidor);
+        const resultado = await solicitarReserva(Number(id), idRepartidor);
         res.status(202).json(resultado); // 202: aceptada, se resuelve en breve (ver /solicitudes/:id)
     } catch (error) {
         manejarError(res, error);
@@ -34,7 +35,8 @@ async function solicitarReserva(req, res) {
 async function consultarSolicitud(req, res) {
     try {
         const { idSolicitud } = req.params;
-        const solicitud = await reservasService.consultarSolicitud(Number(idSolicitud));
+        //const solicitud = await reservasService.consultarSolicitud(Number(idSolicitud));
+        const solicitud = await consultarSolicitud(Number(idSolicitud));
         if (!solicitud) return res.status(404).json({ error: 'Solicitud no encontrada' });
         res.json(solicitud);
     } catch (error) {
@@ -46,11 +48,17 @@ async function soltarHoras(req, res) {
     try {
         const idRepartidor = req.usuario.id_repartidor;
         const { id } = req.params; // id_reserva
-        const resultado = await reservasService.soltarHoras(Number(id), idRepartidor);
+        //const resultado = await reservasService.soltarHoras(Number(id), idRepartidor);
+        const resultado = await soltarHoras(Number(id), idRepartidor);
         res.json(resultado);
     } catch (error) {
         manejarError(res, error);
     }
 }
 
-module.exports = { solicitarReserva, consultarSolicitud, soltarHoras };
+//module.exports = { solicitarReserva, consultarSolicitud, soltarHoras };
+export {
+    solicitarReserva,
+    consultarSolicitud,
+    soltarHoras
+};
