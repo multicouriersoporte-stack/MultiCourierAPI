@@ -1,4 +1,6 @@
 // Middleware para permitir acceso según roles
+// src/middlewares/roles-middlewares.js
+
 export const permitirRoles = (...rolesPermitidos) => {
     return (req, res, next) => {
         try {

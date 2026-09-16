@@ -5,7 +5,7 @@ import { PORT } from "./config.js";
 import http from "http";
 import { Server } from "socket.io";
 import { setupWebSocket } from "./ws/websocket.js";
-import { inicializarFOMPush } from "./ws/FOMPush.js";
+import { inicializarFOMPush } from "./ws/FCMPush.js";
 
 // Servidor HTTP + Socket.IO
 const server = http.createServer(app);
