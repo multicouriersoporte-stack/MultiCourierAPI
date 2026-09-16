@@ -44,6 +44,8 @@ import billeteraclientemovimientoRoutes from "./routes/billeteracliente_movimien
 import { iniciarAsignacionAutomatica } from "./servicios/asignacionAutomatica.js";
 import buscarPedidosRoutes from "./routes/buscarPedidos.routes.js";
 
+import "./servicios/generarHorariosSemanales.job.js";
+
 config();
 
 const app = express();
