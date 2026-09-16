@@ -1,5 +1,11 @@
 //const intercambiosService = require('../servicios/Intercambios.service');
-import intercambiosService from '../servicios/Intercambios.service.js';
+import {
+    ofrecerIntercambio,
+    listarOfertasDisponibles,
+    solicitarIntercambio,
+    aceptarIntercambio,
+    rechazarIntercambio
+} from '../servicios/Intercambios.service.js';
 
 const ERRORES_HTTP = {
     NO_AUTORIZADO: 403,
@@ -19,7 +25,8 @@ async function ofrecer(req, res) {
     try {
         const idRepartidor = req.usuario.id_repartidor; // TODO: ajustar al middleware de auth real
         const { id } = req.params; // id_reserva
-        const resultado = await intercambiosService.ofrecerIntercambio(Number(id), idRepartidor);
+        //const resultado = await intercambiosService.ofrecerIntercambio(Number(id), idRepartidor);
+        const resultado = await ofrecerIntercambio(Number(id), idRepartidor);
         res.status(201).json(resultado);
     } catch (error) { manejarError(res, error); }
 }
