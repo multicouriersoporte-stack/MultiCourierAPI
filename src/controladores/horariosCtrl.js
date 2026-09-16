@@ -1,4 +1,4 @@
-import * as consultaService from "../servicios/horarios.consulta.service.js";
+import * as consultaService from "../servicios/Horarios.consulta.service.js";
 
 export const listarDisponibles = async (req, res) => {
     try {
