@@ -1,4 +1,5 @@
-const intercambiosService = require('../servicios/Intercambios.service');
+//const intercambiosService = require('../servicios/Intercambios.service');
+import intercambiosService from '../servicios/Intercambios.service.js';
 
 const ERRORES_HTTP = {
     NO_AUTORIZADO: 403,
