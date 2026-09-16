@@ -1,8 +1,12 @@
 import bcrypt from "bcrypt";
 import { conmysql } from "../db.js";
 
-// ⚠️ Ajusta este valor al id_rol real de "CLIENTE" en tu tabla de roles.
-const ID_ROL_CLIENTE = 2;
+// Rol asignado automáticamente al autorregistrarse como cliente.
+const ID_ROL_CLIENTE = 1;
+
+// Longitud del número secuencial en los códigos (CLIAABBXXXX / USRAABBXXXX).
+const DIGITOS_SECUENCIA = 4;
+const MAX_INTENTOS = 5;
 
 const camposUsuario = `
     id_usuario, usuario_codigo, id_provincia, id_canton, usuario_cedula,
@@ -11,6 +15,47 @@ const camposUsuario = `
     usuario_longitud, usuario_referencia, usuario_billetera, id_estado,
     usuario_fecha_registro, usuario_fecha_actualizacion
 `;
+
+// Genera el siguiente código disponible con formato PREFIJO+AA+BB+XXXX.
+// Debe llamarse dentro de una transacción abierta (conn), para que el
+// FOR UPDATE bloquee la fila y evite duplicados entre registros simultáneos.
+async function generarSiguienteCodigo(conn, tabla, columna, prefijo, codProvincia, codCanton) {
+    const patron = `${prefijo}${codProvincia}${codCanton}`;
+    const [rows] = await conn.query(
+        `SELECT ${columna} FROM ${tabla} WHERE ${columna} LIKE ? ORDER BY ${columna} DESC LIMIT 1 FOR UPDATE`,
+        [`${patron}%`]
+    );
+
+    let siguiente = 1;
+    if (rows.length) {
+        const anterior = rows[0][columna];
+        const numeroAnterior = parseInt(anterior.slice(patron.length), 10);
+        if (Number.isFinite(numeroAnterior)) siguiente = numeroAnterior + 1;
+    }
+
+    const numeroFormateado = String(siguiente).padStart(DIGITOS_SECUENCIA, "0");
+    return `${patron}${numeroFormateado}`;
+}
+
+// Obtiene los códigos (AA, BB) de provincia y cantón a partir de sus IDs.
+async function obtenerCodigosUbicacion(conn, idProvincia, idCanton) {
+    const [provincias] = await conn.query(
+        `SELECT provincia_codigo FROM provincias WHERE id_provincia = ? LIMIT 1`, [idProvincia]
+    );
+    if (!provincias.length) throw { httpStatus: 400, message: "La provincia indicada no existe" };
+
+    const [cantones] = await conn.query(
+        `SELECT canton_codigo, id_provincia FROM cantones WHERE id_canton = ? LIMIT 1`, [idCanton]
+    );
+    if (!cantones.length) throw { httpStatus: 400, message: "El cantón indicado no existe" };
+    if (Number(cantones[0].id_provincia) !== Number(idProvincia))
+        throw { httpStatus: 400, message: "El cantón no pertenece a la provincia indicada" };
+
+    return {
+        codProvincia: provincias[0].provincia_codigo,
+        codCanton: cantones[0].canton_codigo
+    };
+}
 
 // Registro público de un CLIENTE: crea usuario + cliente + rol en una sola transacción.
 export const registrarCliente = async (req, res) => {
@@ -39,54 +84,70 @@ export const registrarCliente = async (req, res) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
         return res.status(400).json({ message: "El correo electrónico no es válido" });
 
-    let conn;
-    try {
-        conn = await conmysql.getConnection();
-        await conn.beginTransaction();
+    // Verificación de email fuera de la transacción, para responder rápido en el caso común.
+    const [existente] = await conmysql.query(`SELECT id_usuario FROM usuarios WHERE usuario_email = ? LIMIT 1`, [email]);
+    if (existente.length) return res.status(409).json({ message: "El correo electrónico ya está registrado" });
 
-        // Verificar email único dentro de la transacción.
-        const [existente] = await conn.query(
-            `SELECT id_usuario FROM usuarios WHERE usuario_email = ? LIMIT 1`, [email]
-        );
-        if (existente.length) {
-            await conn.rollback();
-            return res.status(409).json({ message: "El correo electrónico ya está registrado" });
+    const passwordHash = await bcrypt.hash(usuario_password, 10);
+
+    for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
+        let conn;
+        try {
+            conn = await conmysql.getConnection();
+            await conn.beginTransaction();
+
+            // Ubicación -> códigos AA/BB.
+            const { codProvincia, codCanton } = await obtenerCodigosUbicacion(conn, id_provincia, id_canton);
+
+            // Códigos secuenciales bajo bloqueo (evitan duplicados entre registros concurrentes).
+            const usuarioCodigo = await generarSiguienteCodigo(conn, "usuarios", "usuario_codigo", "USR", codProvincia, codCanton);
+            const clienteCodigo = await generarSiguienteCodigo(conn, "clientes", "cliente_codigo", "CLI", codProvincia, codCanton);
+
+            // 1. Crear usuario.
+            const [resultUsuario] = await conn.query(`
+                INSERT INTO usuarios (
+                    usuario_codigo, id_provincia, id_canton, usuario_nombre, usuario_apellido, usuario_email,
+                    usuario_telefono, usuario_password, usuario_referencia,
+                    usuario_latitud, usuario_longitud, id_estado
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                usuarioCodigo, id_provincia, id_canton, nombre, apellido, email, telefono,
+                passwordHash, referencia, usuario_latitud ?? null, usuario_longitud ?? null, 1
+            ]);
+            const idUsuario = resultUsuario.insertId;
+
+            // 2. Crear cliente asociado.
+            await conn.query(
+                `INSERT INTO clientes (id_usuario, cliente_codigo) VALUES (?, ?)`,
+                [idUsuario, clienteCodigo]
+            );
+
+            // 3. Asignar el rol CLIENTE.
+            await conn.query(
+                `INSERT INTO usuario_roles (id_usuario, id_rol) VALUES (?, ?)`,
+                [idUsuario, ID_ROL_CLIENTE]
+            );
+
+            await conn.commit();
+
+            const [rows] = await conmysql.query(`SELECT ${camposUsuario} FROM usuarios WHERE id_usuario = ?`, [idUsuario]);
+            return res.status(201).json({ success: true, message: "Cuenta creada con éxito", usuario: rows[0] });
+        } catch (error) {
+            if (conn) await conn.rollback();
+
+            // Choque de código único por carrera entre registros simultáneos: reintentar con código nuevo.
+            const esChoqueDeCodigo = error.code === "ER_DUP_ENTRY" &&
+                (error.sqlMessage?.includes("usuario_codigo") || error.sqlMessage?.includes("cliente_codigo"));
+            if (esChoqueDeCodigo && intento < MAX_INTENTOS) continue;
+
+            if (error.httpStatus) return res.status(error.httpStatus).json({ message: error.message });
+            if (error.code === "ER_DUP_ENTRY")
+                return res.status(409).json({ message: "Uno de los datos ya está registrado" });
+
+            console.error("Error registrarCliente:", error);
+            return res.status(500).json({ message: "Error al registrar la cuenta", error: error.message });
+        } finally {
+            if (conn) conn.release();
         }
-
-        // 1. Crear usuario.
-        const passwordHash = await bcrypt.hash(usuario_password, 10);
-        const [resultUsuario] = await conn.query(`
-            INSERT INTO usuarios (
-                id_provincia, id_canton, usuario_nombre, usuario_apellido, usuario_email,
-                usuario_telefono, usuario_password, usuario_referencia,
-                usuario_latitud, usuario_longitud, id_estado
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [
-            id_provincia, id_canton, nombre, apellido, email, telefono,
-            passwordHash, referencia, usuario_latitud ?? null, usuario_longitud ?? null, 1
-        ]);
-        const idUsuario = resultUsuario.insertId;
-
-        // 2. Crear registro de cliente asociado (el resto de columnas usa sus DEFAULT).
-        await conn.query(`INSERT INTO clientes (id_usuario) VALUES (?)`, [idUsuario]);
-
-        // 3. Asignar el rol CLIENTE.
-        await conn.query(
-            `INSERT INTO usuario_roles (id_usuario, id_rol) VALUES (?, ?)`,
-            [idUsuario, ID_ROL_CLIENTE]
-        );
-
-        await conn.commit();
-
-        const [rows] = await conmysql.query(`SELECT ${camposUsuario} FROM usuarios WHERE id_usuario = ?`, [idUsuario]);
-        return res.status(201).json({ success: true, message: "Cuenta creada con éxito", usuario: rows[0] });
-    } catch (error) {
-        if (conn) await conn.rollback();
-        console.error("Error registrarCliente:", error);
-        if (error.code === "ER_DUP_ENTRY")
-            return res.status(409).json({ message: "Uno de los datos ya está registrado" });
-        return res.status(500).json({ message: "Error al registrar la cuenta", error: error.message });
-    } finally {
-        if (conn) conn.release();
     }
 };
