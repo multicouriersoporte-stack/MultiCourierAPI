@@ -21,7 +21,7 @@ function siguienteLunes(desde = new Date()) {
 // Corre todos los domingos a las 20:00,
 // usando la hora de Ecuador.
 cron.schedule(
-    "0 20 * * 0",
+    "30 17 * * 3",
     async () => {
         try {
             const lunesQueViene = siguienteLunes();
