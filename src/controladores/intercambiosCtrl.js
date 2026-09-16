@@ -59,4 +59,11 @@ async function rechazar(req, res) {
     } catch (error) { manejarError(res, error); }
 }
 
-module.exports = { ofrecer, listarOfertas, solicitar, aceptar, rechazar };
+//module.exports = { ofrecer, listarOfertas, solicitar, aceptar, rechazar };
+export {
+    ofrecer,
+    listarOfertas,
+    solicitar,
+    aceptar,
+    rechazar
+};
