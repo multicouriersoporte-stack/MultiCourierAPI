@@ -27,6 +27,7 @@ import productosRoutes from "./routes/productos.routes.js";
 import pagolocalesRoutes from "./routes/pagoslocales.routes.js";
 import pagorepartidorRoutes from "./routes/pagosrepartidor.routes.js";
 import billeterasRoutes from "./routes/billeteras.routes.js";
+import balanceRoutes from "./routes/balance.routes.js";
 import metodospagoRoutes from "./routes/metodospago.routes.js";
 import rolesRoutes from "./routes/roles.routes.js";
 import usuariorolesRoutes from "./routes/usuarioroles.routes.js";
@@ -90,6 +91,7 @@ app.use("/api", productosRoutes);
 app.use("/api", pagolocalesRoutes);
 app.use("/api", pagorepartidorRoutes);
 app.use("/api", billeterasRoutes);
+app.use("/api", balanceRoutes);
 app.use("/api", metodospagoRoutes);
 
 app.use("/api", rolesRoutes);
