@@ -1,5 +1,5 @@
 import { conmysql } from "../db.js";
-import { haySolapamiento } from "./reservas.service.js";
+import { haySolapamiento } from "./Reservas.service.js";
 
 // Estado 5 = EN_INTERCAMBIO. La reserva sigue perteneciendo al oferente.
 export async function ofrecerIntercambio(idReserva, idRepartidor) {
