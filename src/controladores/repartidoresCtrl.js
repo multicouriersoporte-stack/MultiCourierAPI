@@ -463,43 +463,67 @@ export const postRepartidores = async (req, res) => {
 
 // Cambiar únicamente el estado.
 export const cambiarEstadoRepartidor = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { id_estado_repartidor } = req.body;
+  try {
+    const { id } = req.params;
+    const { id_estado_repartidor } = req.body;
+    const nuevoEstado = Number(id_estado_repartidor);
 
-        if (!id_estado_repartidor) return res.status(400).json({ message: "id_estado_repartidor es obligatorio" });
-
-        const [estado] = await conmysql.query(`
-            SELECT id_estado_repartidor, estado_repartidor_nombre
-            FROM estados_repartidor
-            WHERE id_estado_repartidor = ? AND estado_repartidor_estado = 1
-        `, [id_estado_repartidor]);
-
-        if (!estado.length) return res.status(400).json({ message: "El estado del repartidor no existe o está inactivo" });
-
-        const [repartidor] = await conmysql.query(
-            `SELECT id_repartidor FROM repartidores WHERE id_repartidor = ?`, [id]
-        );
-
-        if (!repartidor.length) return res.status(404).json({ message: "Repartidor no encontrado" });
-
-        await conmysql.query(
-            `UPDATE repartidores SET id_estado_repartidor = ? WHERE id_repartidor = ?`,
-            [id_estado_repartidor, id]
-        );
-
-        const [resultado] = await conmysql.query(
-            `${selectRepartidor} WHERE r.id_repartidor = ?`, [id]
-        );
-
-        return res.json({
-            message: "Estado del repartidor actualizado correctamente",
-            repartidor: resultado[0]
-        });
-    } catch (error) {
-        console.error("Error cambiarEstadoRepartidor:", error);
-        return res.status(500).json({ message: "Error al cambiar estado del repartidor", error: error.message });
+    if (![2, 4].includes(nuevoEstado)) {
+      return res.status(400).json({
+        message: "Solo puedes cambiar entre REPARTIENDO (2) y EN_PAUSA (4)."
+      });
     }
+
+    // Validar que el repartidor existe y obtener estado actual
+    const [rep] = await conmysql.query(
+      `SELECT id_repartidor, id_estado_repartidor FROM repartidores WHERE id_repartidor = ?`,
+      [id]
+    );
+    if (!rep.length) return res.status(404).json({ message: "Repartidor no encontrado" });
+
+    const estadoActual = Number(rep[0].id_estado_repartidor);
+
+    // No se puede cambiar si está EN_PEDIDO, DESCONECTADO o INHABILITADO
+    if ([3, 5, 6].includes(estadoActual)) {
+      return res.status(403).json({
+        message: "No puedes cambiar el estado en este momento. Debes estar en un turno activo (REPARTIENDO o EN_PAUSA)."
+      });
+    }
+
+    // Debe estar dentro de un horario/reserva activa
+    const dentroDeTurno = await estaDentroDeTurnoActivo(id); // implementa con tu tabla de reservas
+    if (!dentroDeTurno) {
+      return res.status(403).json({
+        message: "Solo puedes cambiar entre REPARTIENDO y EN_PAUSA mientras estés dentro de un horario reservado."
+      });
+    }
+
+    // Validar estado destino activo
+    const [estado] = await conmysql.query(`
+      SELECT id_estado_repartidor, estado_repartidor_nombre
+      FROM estados_repartidor
+      WHERE id_estado_repartidor = ? AND estado_repartidor_estado = 1
+    `, [nuevoEstado]);
+    if (!estado.length) {
+      return res.status(400).json({ message: "El estado del repartidor no existe o está inactivo" });
+    }
+
+    await conmysql.query(
+      `UPDATE repartidores SET id_estado_repartidor = ? WHERE id_repartidor = ?`,
+      [nuevoEstado, id]
+    );
+
+    const [resultado] = await conmysql.query(
+      `${selectRepartidor} WHERE r.id_repartidor = ?`, [id]
+    );
+    return res.json({
+      message: "Estado del repartidor actualizado correctamente",
+      repartidor: resultado[0]
+    });
+  } catch (error) {
+    console.error("Error cambiarEstadoRepartidor:", error);
+    return res.status(500).json({ message: "Error al cambiar estado del repartidor", error: error.message });
+  }
 };
 
 // Actualizar todos los campos.
