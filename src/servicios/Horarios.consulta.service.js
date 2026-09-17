@@ -16,6 +16,7 @@ export async function obtenerDisponiblesPorFecha(fecha) {
     const [rows] = await conmysql.query(
         `SELECT * FROM horarios_disponibles
      WHERE horario_fecha = ? AND horario_estado = 1
+       AND TIMESTAMP(horario_fecha, horario_hora_inicio) > NOW()
      ORDER BY horario_hora_inicio`,
         [fecha]
     );
