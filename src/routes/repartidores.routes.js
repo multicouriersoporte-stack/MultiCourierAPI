@@ -60,7 +60,7 @@ import { permitirRoles } from "../middlewares/roles.middleware.js";
 const router = express.Router();
 
 // Consultas
-router.get("/repartidores", verificarToken, permitirRoles("LOCAL", "CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidores);
+router.get("/repartidores", verificarToken, permitirRoles("CLIENTE", "LOCAL", "REPARTIDOR", "CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"), getRepartidores);
 router.get("/repartidores/usuario/:id_usuario", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorPorUsuario);
 router.get("/repartidores/codigo/:codigo", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorPorCodigo);
 router.get("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE"), getRepartidorxid);
