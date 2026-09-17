@@ -354,7 +354,7 @@ export const getRepartidorPorCodigo = async (req, res) => {
 // Obtener el primer repartidor disponible.
 export const getRepartidorDisponible = async (req, res) => {
     try {
-        const [result] = await conmysql.query(`
+/*         const [result] = await conmysql.query(`
             SELECT r.*, ${usuarioSelect}, ${estadoSelect}
             FROM repartidores r
             INNER JOIN usuarios u ON r.id_usuario = u.id_usuario
@@ -366,6 +366,30 @@ export const getRepartidorDisponible = async (req, res) => {
             ELSE r.repartidor_posicion_ranking END ASC,
             r.repartidor_total_pedidos ASC, r.repartidor_calificacion DESC
             LIMIT 1
+        `); */
+        const [result] = await conmysql.query(`
+          SELECT r.*, ${usuarioSelect}, ${estadoSelect}
+          FROM repartidores r
+          INNER JOIN usuarios u ON r.id_usuario = u.id_usuario
+          INNER JOIN estados_repartidor er ON r.id_estado_repartidor = er.id_estado_repartidor
+          WHERE r.id_estado_repartidor IN (1, 2)          -- LISTO, REPARTIENDO
+            AND er.estado_repartidor_estado = 1
+            AND er.estado_repartidor_permite_pedidos = 1
+            AND EXISTS (
+              -- Horario/reserva activa en este momento (día + hora)
+              SELECT 1
+              FROM horarios_repartidor hr
+              -- o desde la tabla de reservas si usáis otra
+              WHERE hr.id_repartidor = r.id_repartidor
+                AND hr.horario_repartidor_estado = 1
+                AND hr.horario_repartidor_dia = WEEKDAY(CURDATE()) + 1  -- ajustar mapeo día
+                AND CURTIME() BETWEEN hr.horario_repartidor_hora_inicio
+                                  AND hr.horario_repartidor_hora_fin
+            )
+          ORDER BY CASE WHEN r.repartidor_posicion_ranking IS NULL THEN 999999
+                   ELSE r.repartidor_posicion_ranking END ASC,
+                   r.repartidor_total_pedidos ASC, r.repartidor_calificacion DESC
+          LIMIT 1
         `);
 
         if (!result.length) return res.status(404).json({ message: "No hay repartidores disponibles" });
