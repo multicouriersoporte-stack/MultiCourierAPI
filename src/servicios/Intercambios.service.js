@@ -224,3 +224,49 @@ export async function rechazarIntercambio(idIntercambio, idRepartidorOfrece) {
         conn.release();
     }
 }
+
+
+// Cancela la oferta de intercambio (solo el oferente). Libera las reservas involucradas.
+export async function cancelarIntercambio(idIntercambio, idRepartidorOfrece) {
+    const conn = await conmysql.getConnection();
+    try {
+        await conn.beginTransaction();
+        const [[intercambio]] = await conn.query(
+            `SELECT * FROM horario_intercambios WHERE id_intercambio = ? FOR UPDATE`, [idIntercambio]
+        );
+        if (!intercambio || intercambio.id_repartidor_ofrece !== idRepartidorOfrece)
+            throw Object.assign(new Error("No autorizado"), { codigo: "NO_AUTORIZADO" });
+        if (![1, 2].includes(intercambio.intercambio_estado))
+            throw Object.assign(new Error("Este intercambio ya no se puede cancelar"), { codigo: "ESTADO_INVALIDO" });
+
+        // Reactiva la reserva ofrecida
+        await conn.query(
+            `UPDATE horario_reservas SET reserva_estado = 1 WHERE id_reserva = ?`,
+            [intercambio.id_reserva_ofrecida]
+        );
+
+        // Si había una propuesta del solicitante, también la reactiva
+        if (intercambio.id_reserva_solicitante) {
+            await conn.query(
+                `UPDATE horario_reservas SET reserva_estado = 1 WHERE id_reserva = ?`,
+                [intercambio.id_reserva_solicitante]
+            );
+        }
+
+        await conn.query(
+            `UPDATE horario_intercambios
+             SET intercambio_estado = 4, fecha_resolucion = NOW(),
+                 id_reserva_solicitante = NULL, id_repartidor_solicitante = NULL
+             WHERE id_intercambio = ?`,
+            [idIntercambio]
+        );
+
+        await conn.commit();
+        return { estado: "cancelado" };
+    } catch (error) {
+        await conn.rollback();
+        throw error;
+    } finally {
+        conn.release();
+    }
+}
