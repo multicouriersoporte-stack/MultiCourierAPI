@@ -27,5 +27,6 @@ router.get("/intercambios/mis-intercambios", verificarToken, SOLO_REPARTIDOR, mi
 router.post("/intercambios/:id/solicitar", verificarToken, SOLO_REPARTIDOR, solicitar);
 router.patch("/intercambios/:id/aceptar", verificarToken, SOLO_REPARTIDOR, aceptar);
 router.patch("/intercambios/:id/rechazar", verificarToken, SOLO_REPARTIDOR, rechazar);
+router.patch("/intercambios/:id/cancelar", verificarToken, SOLO_REPARTIDOR, cancelar);
 
 export default router;
