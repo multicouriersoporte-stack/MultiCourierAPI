@@ -12,6 +12,18 @@ export const listarDisponibles = async (req, res) => {
     }
 };
 
+export const listarMisReservasActivas = async (req, res) => {
+    try {
+        const idRepartidor = req.usuario?.id_repartidor;
+        if (!idRepartidor) return res.status(401).json({ error: "No autenticado como repartidor" });
+        const reservas = await consultaService.obtenerMisReservasActivas(idRepartidor);
+        res.json(reservas);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al listar tus reservas activas" });
+    }
+};
+
 export const listarMisHoras = async (req, res) => {
     try {
         const { fecha } = req.query;
