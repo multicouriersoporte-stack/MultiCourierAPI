@@ -1,7 +1,7 @@
 import express from "express";
 import { listarDisponibles, listarMisReservasActivas, listarMisHoras, listarHistorial } from "../controladores/horariosCtrl.js";
 import { solicitarReserva, consultarSolicitud, soltarHoras } from "../controladores/reservasCtrl.js";
-import { ofrecer, listarOfertas, misIntercambios, solicitar, aceptar, rechazar } from "../controladores/intercambiosCtrl.js";
+import { ofrecer, listarOfertas, misIntercambios, solicitar, aceptar, rechazar, cancelar } from "../controladores/intercambiosCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
 
