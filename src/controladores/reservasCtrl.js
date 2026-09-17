@@ -11,16 +11,13 @@ const ERRORES_HTTP = {
     NO_AUTORIZADO: 403,
     ESTADO_INVALIDO: 409,
     TURNO_EN_CURSO: 409,
+    TURNO_MUY_PRONTO: 409,
 };
 
 function manejarError(res, error) {
     console.error(error);
-
     const status = ERRORES_HTTP[error.codigo] || 500;
-
-    res.status(status).json({
-        error: error.message || 'Error inesperado'
-    });
+    res.status(status).json({ error: error.message || 'Error inesperado', codigo: error.codigo });
 }
 
 async function solicitarReserva(req, res) {
