@@ -3,6 +3,7 @@ import { conmysql } from "../db.js";
 // Ventana para agrupar solicitudes casi simultáneas.
 const VENTANA_RESOLUCION_MS = 800;
 const timersPorHorario = new Map();
+const MINUTOS_ANTICIPACION_MINIMA = 15;
 
 // Calcula las horas acumuladas de las reservas activas de los repartidores.
 async function calcularHorasAcumuladas(conn, idsRepartidores) {
@@ -51,6 +52,11 @@ export async function haySolapamiento(conn, idRepartidor, horarioCandidato, excl
 }
 
 // Registra la solicitud y la deja pendiente para resolverla por prioridad.
+function calcularInicioTurno(horario) {
+    const fecha = new Date(horario.horario_fecha).toISOString().slice(0, 10);
+    return new Date(`${fecha}T${horario.horario_hora_inicio}`);
+}
+
 export async function solicitarReserva(idHorarioDisponible, idRepartidor) {
     const conn = await conmysql.getConnection();
     let idSolicitud;
@@ -68,6 +74,17 @@ export async function solicitarReserva(idHorarioDisponible, idRepartidor) {
 
         if (horario.horario_estado !== 1)
             throw Object.assign(new Error("El horario ya no está disponible"), { codigo: "NO_DISPONIBLE" });
+
+        const minutosParaInicio = (calcularInicioTurno(horario) - new Date()) / 60000;
+
+        if (minutosParaInicio <= 0)
+            throw Object.assign(new Error("Este turno ya comenzó"), { codigo: "TURNO_EN_CURSO" });
+
+        if (minutosParaInicio < MINUTOS_ANTICIPACION_MINIMA)
+            throw Object.assign(
+                new Error(`Debes solicitar este turno con al menos ${MINUTOS_ANTICIPACION_MINIMA} minutos de anticipación`),
+                { codigo: "TURNO_MUY_PRONTO" }
+            );
 
         if (await haySolapamiento(conn, idRepartidor, horario))
             throw Object.assign(new Error("Ya tienes un turno que choca con este horario"), { codigo: "CHOQUE_HORARIO" });
