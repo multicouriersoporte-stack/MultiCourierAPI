@@ -4,7 +4,8 @@ import {
     listarMisIntercambios,
     solicitarIntercambio,
     aceptarIntercambio,
-    rechazarIntercambio
+    rechazarIntercambio,
+    cancelarIntercambio
 } from '../servicios/Intercambios.service.js';
 import { obtenerIdUsuario, obtenerRepartidorDelUsuario } from './pedidosCtrl.js';
 
@@ -17,12 +18,14 @@ const ERRORES_HTTP = {
     INTERCAMBIO_INVALIDO: 409,
     RESERVAS_NO_ENCONTRADAS: 404,
     HORARIOS_NO_ENCONTRADOS: 404,
+    TURNO_MUY_PRONTO: 409,
+    TURNO_EN_CURSO: 409,
 };
 
 function manejarError(res, error) {
     console.error(error);
     const status = ERRORES_HTTP[error.codigo] || 500;
-    res.status(status).json({ error: error.message || 'Error inesperado' });
+    res.status(status).json({ error: error.message || 'Error inesperado', codigo: error.codigo });
 }
 
 async function resolverIdRepartidor(req, res) {
@@ -44,7 +47,9 @@ async function ofrecer(req, res) {
 
 async function listarOfertas(req, res) {
     try {
-        const ofertas = await listarOfertasDisponibles();
+        const idRepartidor = await resolverIdRepartidor(req, res);
+        if (!idRepartidor) return;
+        const ofertas = await listarOfertasDisponibles(idRepartidor);
         res.json(ofertas);
     } catch (error) { manejarError(res, error); }
 }
@@ -89,11 +94,23 @@ async function rechazar(req, res) {
     } catch (error) { manejarError(res, error); }
 }
 
+// NUEVO
+async function cancelar(req, res) {
+    try {
+        const idRepartidor = await resolverIdRepartidor(req, res);
+        if (!idRepartidor) return;
+        const { id } = req.params;
+        const resultado = await cancelarIntercambio(Number(id), idRepartidor);
+        res.json(resultado);
+    } catch (error) { manejarError(res, error); }
+}
+
 export {
     ofrecer,
     listarOfertas,
     misIntercambios,
     solicitar,
     aceptar,
-    rechazar
+    rechazar,
+    cancelar
 };
