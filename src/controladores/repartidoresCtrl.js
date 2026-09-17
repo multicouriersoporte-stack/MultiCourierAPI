@@ -309,6 +309,22 @@ export const getRepartidores = async (req, res) => {
     }
 };
 
+// Obtener el repartidor del usuario autenticado.
+export const getMiRepartidor = async (req, res) => {
+  try {
+    const idUsuario = req.usuario?.id_usuario;
+    if (!idUsuario) return res.status(401).json({ message: "No se pudo identificar al usuario autenticado" });
+
+    const [result] = await conmysql.query(`${selectRepartidor} WHERE r.id_usuario = ?`, [idUsuario]);
+    if (!result.length) return res.status(404).json({ message: "No existe un repartidor asociado a este usuario" });
+
+    return res.json(result[0]);
+  } catch (error) {
+    console.error("Error getMiRepartidor:", error);
+    return res.status(500).json({ message: "Error al consultar los datos del repartidor", error: error.message });
+  }
+};
+
 // Obtener repartidor por ID.
 export const getRepartidorxid = async (req, res) => {
     try {
