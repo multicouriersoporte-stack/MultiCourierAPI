@@ -1,5 +1,17 @@
 import { conmysql } from "../db.js";
 
+export async function obtenerMisReservasActivas(idRepartidor) {
+    const [rows] = await conmysql.query(
+        `SELECT hr.id_reserva, hr.reserva_estado, hd.*
+     FROM horario_reservas hr
+     JOIN horarios_disponibles hd ON hd.id_horario_disponible = hr.id_horario_disponible
+     WHERE hr.id_repartidor = ? AND hr.reserva_estado = 1
+     ORDER BY hd.horario_fecha, hd.horario_hora_inicio`,
+        [idRepartidor]
+    );
+    return rows;
+}
+
 export async function obtenerDisponiblesPorFecha(fecha) {
     const [rows] = await conmysql.query(
         `SELECT * FROM horarios_disponibles
