@@ -93,6 +93,16 @@ export async function generarHorariosSemana(fechaLunes) {
     }
 }
 
+export async function finalizarHorariosVencidos() {
+    const [resultado] = await conmysql.query(
+        `UPDATE horarios_disponibles
+     SET horario_estado = 3
+     WHERE horario_estado NOT IN (3, 4)
+       AND TIMESTAMP(horario_fecha, horario_hora_fin) <= NOW()`
+    );
+    return resultado.affectedRows;
+}
+
 // Elimina horarios antiguos sin reservas y finaliza los que sí tuvieron reservas.
 export async function limpiarSemanaAnterior(fechaLunesActual) {
     const fechaLimiteISO = aISO(fechaLunesActual);
