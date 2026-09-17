@@ -50,6 +50,30 @@ export async function listarOfertasDisponibles() {
     return rows;
 }
 
+// Ofertas propias (activas o con una propuesta esperando decisión) del repartidor que ofrece.
+export async function listarMisIntercambios(idRepartidor) {
+    const [rows] = await conmysql.query(
+        `SELECT hi.id_intercambio, hi.intercambio_estado,
+            hi.id_reserva_ofrecida,
+            hdo.horario_fecha AS oferta_fecha,
+            hdo.horario_hora_inicio AS oferta_hora_inicio,
+            hdo.horario_hora_fin AS oferta_hora_fin,
+            hi.id_reserva_solicitante, hi.id_repartidor_solicitante,
+            hds.horario_fecha AS propuesta_fecha,
+            hds.horario_hora_inicio AS propuesta_hora_inicio,
+            hds.horario_hora_fin AS propuesta_hora_fin
+     FROM horario_intercambios hi
+     JOIN horario_reservas hro ON hro.id_reserva = hi.id_reserva_ofrecida
+     JOIN horarios_disponibles hdo ON hdo.id_horario_disponible = hro.id_horario_disponible
+     LEFT JOIN horario_reservas hrs ON hrs.id_reserva = hi.id_reserva_solicitante
+     LEFT JOIN horarios_disponibles hds ON hds.id_horario_disponible = hrs.id_horario_disponible
+     WHERE hi.id_repartidor_ofrece = ? AND hi.intercambio_estado IN (1, 2)
+     ORDER BY hi.fecha_oferta DESC`,
+        [idRepartidor]
+    );
+    return rows;
+}
+
 // El repartidor propone una de sus reservas a cambio de la oferta.
 export async function solicitarIntercambio(idIntercambio, idReservaPropia, idRepartidorSolicitante) {
     const conn = await conmysql.getConnection();
