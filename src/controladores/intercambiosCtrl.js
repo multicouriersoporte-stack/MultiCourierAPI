@@ -1,6 +1,7 @@
 import {
     ofrecerIntercambio,
     listarOfertasDisponibles,
+    listarMisIntercambios,
     solicitarIntercambio,
     aceptarIntercambio,
     rechazarIntercambio
@@ -39,6 +40,14 @@ async function listarOfertas(req, res) {
     } catch (error) { manejarError(res, error); }
 }
 
+async function misIntercambios(req, res) {
+    try {
+        const idRepartidor = req.usuario.id_repartidor;
+        const intercambios = await listarMisIntercambios(idRepartidor);
+        res.json(intercambios);
+    } catch (error) { manejarError(res, error); }
+}
+
 async function solicitar(req, res) {
     try {
         const idRepartidor = req.usuario.id_repartidor;
@@ -70,6 +79,7 @@ async function rechazar(req, res) {
 export {
     ofrecer,
     listarOfertas,
+    misIntercambios,
     solicitar,
     aceptar,
     rechazar
