@@ -1,4 +1,5 @@
 import * as consultaService from "../servicios/Horarios.consulta.service.js";
+import { obtenerIdUsuario, obtenerRepartidorDelUsuario } from "./pedidosCtrl.js";
 
 export const listarDisponibles = async (req, res) => {
     try {
@@ -14,8 +15,9 @@ export const listarDisponibles = async (req, res) => {
 
 export const listarMisReservasActivas = async (req, res) => {
     try {
-        const idRepartidor = req.usuario?.id_repartidor;
-        if (!idRepartidor) return res.status(401).json({ error: "No autenticado como repartidor" });
+        if (!req.usuario) return res.status(401).json({ error: "No autenticado" });
+        const idRepartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
+        if (!idRepartidor) return res.status(403).json({ error: "El usuario no tiene un repartidor asociado" });
         const reservas = await consultaService.obtenerMisReservasActivas(idRepartidor);
         res.json(reservas);
     } catch (error) {
@@ -27,10 +29,10 @@ export const listarMisReservasActivas = async (req, res) => {
 export const listarMisHoras = async (req, res) => {
     try {
         const { fecha } = req.query;
-        // Ajusta según tu middleware de auth (ej. req.usuario.id_repartidor)
-        const idRepartidor = req.usuario?.id_repartidor;
         if (!fecha) return res.status(400).json({ error: "Falta el parámetro fecha" });
-        if (!idRepartidor) return res.status(401).json({ error: "No autenticado como repartidor" });
+        if (!req.usuario) return res.status(401).json({ error: "No autenticado" });
+        const idRepartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
+        if (!idRepartidor) return res.status(403).json({ error: "El usuario no tiene un repartidor asociado" });
         const misHoras = await consultaService.obtenerMisHorasPorFecha(idRepartidor, fecha);
         res.json(misHoras);
     } catch (error) {
@@ -41,9 +43,10 @@ export const listarMisHoras = async (req, res) => {
 
 export const listarHistorial = async (req, res) => {
     try {
-        const idRepartidor = req.usuario?.id_repartidor;
+        if (!req.usuario) return res.status(401).json({ error: "No autenticado" });
+        const idRepartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
+        if (!idRepartidor) return res.status(403).json({ error: "El usuario no tiene un repartidor asociado" });
         const { desde, hasta } = req.query;
-        if (!idRepartidor) return res.status(401).json({ error: "No autenticado como repartidor" });
         const historial = await consultaService.obtenerHistorial(idRepartidor, { desde, hasta });
         res.json(historial);
     } catch (error) {
