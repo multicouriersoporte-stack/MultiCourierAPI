@@ -6,6 +6,7 @@ export async function obtenerMisReservasActivas(idRepartidor) {
      FROM horario_reservas hr
      JOIN horarios_disponibles hd ON hd.id_horario_disponible = hr.id_horario_disponible
      WHERE hr.id_repartidor = ? AND hr.reserva_estado = 1
+       AND TIMESTAMP(hd.horario_fecha, hd.horario_hora_fin) > NOW()
      ORDER BY hd.horario_fecha, hd.horario_hora_inicio`,
         [idRepartidor]
     );
@@ -16,7 +17,7 @@ export async function obtenerDisponiblesPorFecha(fecha) {
     const [rows] = await conmysql.query(
         `SELECT * FROM horarios_disponibles
      WHERE horario_fecha = ? AND horario_estado = 1
-       AND TIMESTAMP(horario_fecha, horario_hora_inicio) > NOW()
+       AND TIMESTAMP(horario_fecha, horario_hora_fin) > NOW()
      ORDER BY horario_hora_inicio`,
         [fecha]
     );
@@ -29,6 +30,7 @@ export async function obtenerMisHorasPorFecha(idRepartidor, fecha) {
      FROM horario_reservas hr
      JOIN horarios_disponibles hd ON hd.id_horario_disponible = hr.id_horario_disponible
      WHERE hr.id_repartidor = ? AND hd.horario_fecha = ? AND hr.reserva_estado IN (1, 5)
+       AND TIMESTAMP(hd.horario_fecha, hd.horario_hora_fin) > NOW()
      ORDER BY hd.horario_hora_inicio`,
         [idRepartidor, fecha]
     );
