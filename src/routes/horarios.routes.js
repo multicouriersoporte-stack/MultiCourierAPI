@@ -1,5 +1,5 @@
 import express from "express";
-import { listarDisponibles, listarMisHoras, listarHistorial } from "../controladores/horariosCtrl.js";
+import { listarDisponibles, listarMisReservasActivas, listarMisHoras, listarHistorial } from "../controladores/horariosCtrl.js";
 import { solicitarReserva, consultarSolicitud, soltarHoras } from "../controladores/reservasCtrl.js";
 import { ofrecer, listarOfertas, misIntercambios, solicitar, aceptar, rechazar } from "../controladores/intercambiosCtrl.js";
 // import { verificarToken } from "../middlewares/auth.middleware.js";
@@ -9,6 +9,7 @@ const router = express.Router();
 
 // Consultas
 router.get("/horarios/disponibles", /* verificarToken, */ listarDisponibles);
+router.get("/horarios/mis-reservas-activas", /* verificarToken, */ listarMisReservasActivas);
 router.get("/horarios/mis-horas", /* verificarToken, */ listarMisHoras);
 router.get("/horarios/historial", /* verificarToken, */ listarHistorial);
 
