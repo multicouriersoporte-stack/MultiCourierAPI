@@ -103,29 +103,38 @@ export async function finalizarHorariosVencidos() {
     return resultado.affectedRows;
 }
 
-// Elimina horarios antiguos sin reservas y finaliza los que sí tuvieron reservas.
-export async function limpiarSemanaAnterior(fechaLunesActual) {
-    const fechaLimiteISO = aISO(fechaLunesActual);
+// Borra horarios (y sus reservas/historial) más viejos que la semana anterior.
+// Solo queda visible: semana anterior + semana actual.
+export async function purgarHistorialAntiguo(fechaLunesActual) {
+    const limiteISO = aISO(sumarDias(fechaLunesActual, -7));
     const conn = await conmysql.getConnection();
 
     try {
         await conn.beginTransaction();
 
-        const [borrados] = await conn.query(
-            `DELETE hd FROM horarios_disponibles hd
-       LEFT JOIN horario_reservas hr ON hr.id_horario_disponible = hd.id_horario_disponible
-       WHERE hd.horario_fecha < ? AND hr.id_reserva IS NULL`,
-            [fechaLimiteISO]
+        // Si hay intercambios ligados a estas reservas, límpialos primero para no chocar con la FK.
+        await conn.query(
+            `DELETE hi FROM horario_intercambios hi
+       JOIN horario_reservas hr ON hr.id_reserva = hi.id_reserva_ofrecida
+       JOIN horarios_disponibles hd ON hd.id_horario_disponible = hr.id_horario_disponible
+       WHERE hd.horario_fecha < ?`,
+            [limiteISO]
         );
 
-        const [finalizados] = await conn.query(
-            `UPDATE horarios_disponibles SET horario_estado = 3
-       WHERE horario_fecha < ? AND horario_estado NOT IN (3, 4)`,
-            [fechaLimiteISO]
+        await conn.query(
+            `DELETE hr FROM horario_reservas hr
+       JOIN horarios_disponibles hd ON hd.id_horario_disponible = hr.id_horario_disponible
+       WHERE hd.horario_fecha < ?`,
+            [limiteISO]
+        );
+
+        const [borrados] = await conn.query(
+            `DELETE FROM horarios_disponibles WHERE horario_fecha < ?`,
+            [limiteISO]
         );
 
         await conn.commit();
-        return { eliminados: borrados.affectedRows, finalizados: finalizados.affectedRows };
+        return { eliminados: borrados.affectedRows };
     } catch (error) {
         await conn.rollback();
         throw error;
