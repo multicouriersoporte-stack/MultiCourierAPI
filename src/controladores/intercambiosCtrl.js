@@ -6,6 +6,7 @@ import {
     aceptarIntercambio,
     rechazarIntercambio
 } from '../servicios/Intercambios.service.js';
+import { obtenerIdUsuario, obtenerRepartidorDelUsuario } from './pedidosCtrl.js';
 
 const ERRORES_HTTP = {
     NO_AUTORIZADO: 403,
@@ -24,9 +25,17 @@ function manejarError(res, error) {
     res.status(status).json({ error: error.message || 'Error inesperado' });
 }
 
+async function resolverIdRepartidor(req, res) {
+    if (!req.usuario) { res.status(401).json({ error: 'No autenticado' }); return null; }
+    const idRepartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
+    if (!idRepartidor) { res.status(403).json({ error: 'El usuario no tiene un repartidor asociado' }); return null; }
+    return idRepartidor;
+}
+
 async function ofrecer(req, res) {
     try {
-        const idRepartidor = req.usuario.id_repartidor; // TODO: ajustar al middleware de auth real
+        const idRepartidor = await resolverIdRepartidor(req, res);
+        if (!idRepartidor) return;
         const { id } = req.params; // id_reserva
         const resultado = await ofrecerIntercambio(Number(id), idRepartidor);
         res.status(201).json(resultado);
@@ -42,7 +51,8 @@ async function listarOfertas(req, res) {
 
 async function misIntercambios(req, res) {
     try {
-        const idRepartidor = req.usuario.id_repartidor;
+        const idRepartidor = await resolverIdRepartidor(req, res);
+        if (!idRepartidor) return;
         const intercambios = await listarMisIntercambios(idRepartidor);
         res.json(intercambios);
     } catch (error) { manejarError(res, error); }
@@ -50,7 +60,8 @@ async function misIntercambios(req, res) {
 
 async function solicitar(req, res) {
     try {
-        const idRepartidor = req.usuario.id_repartidor;
+        const idRepartidor = await resolverIdRepartidor(req, res);
+        if (!idRepartidor) return;
         const { id } = req.params; // id_intercambio
         const { id_reserva_propia } = req.body;
         const resultado = await solicitarIntercambio(Number(id), Number(id_reserva_propia), idRepartidor);
@@ -60,7 +71,8 @@ async function solicitar(req, res) {
 
 async function aceptar(req, res) {
     try {
-        const idRepartidor = req.usuario.id_repartidor;
+        const idRepartidor = await resolverIdRepartidor(req, res);
+        if (!idRepartidor) return;
         const { id } = req.params;
         const resultado = await aceptarIntercambio(Number(id), idRepartidor);
         res.json(resultado);
@@ -69,7 +81,8 @@ async function aceptar(req, res) {
 
 async function rechazar(req, res) {
     try {
-        const idRepartidor = req.usuario.id_repartidor;
+        const idRepartidor = await resolverIdRepartidor(req, res);
+        if (!idRepartidor) return;
         const { id } = req.params;
         const resultado = await rechazarIntercambio(Number(id), idRepartidor);
         res.json(resultado);
