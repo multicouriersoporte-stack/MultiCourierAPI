@@ -17,20 +17,37 @@ const ERRORES_HTTP = {
 function manejarError(res, error) {
     console.error(error);
     const status = ERRORES_HTTP[error.codigo] || 500;
-    res.status(status).json({ error: error.message || 'Error inesperado', codigo: error.codigo });
+    res.status(status).json({
+        error: error.message || 'Error inesperado',
+        codigo: error.codigo
+    });
 }
 
 async function solicitarReserva(req, res) {
     try {
-        const idRepartidor = req.usuario.id_repartidor;
+        const idRepartidor = req.usuario?.id_repartidor;
+        if (!idRepartidor) {
+            return res.status(401).json({ error: 'No autenticado como repartidor' });
+        }
+
         const { id } = req.params;
-
-        const resultado = await solicitarReservaService(
-            Number(id),
-            idRepartidor
-        );
-
+        const resultado = await solicitarReservaService(Number(id), idRepartidor);
         res.status(202).json(resultado);
+    } catch (error) {
+        manejarError(res, error);
+    }
+}
+
+async function soltarHoras(req, res) {
+    try {
+        const idRepartidor = req.usuario?.id_repartidor;
+        if (!idRepartidor) {
+            return res.status(401).json({ error: 'No autenticado como repartidor' });
+        }
+
+        const { id } = req.params;
+        const resultado = await soltarHorasService(Number(id), idRepartidor);
+        res.json(resultado);
     } catch (error) {
         manejarError(res, error);
     }
@@ -39,10 +56,7 @@ async function solicitarReserva(req, res) {
 async function consultarSolicitud(req, res) {
     try {
         const { idSolicitud } = req.params;
-
-        const solicitud = await consultarSolicitudService(
-            Number(idSolicitud)
-        );
+        const solicitud = await consultarSolicitudService(Number(idSolicitud));
 
         if (!solicitud) {
             return res.status(404).json({
@@ -51,22 +65,6 @@ async function consultarSolicitud(req, res) {
         }
 
         res.json(solicitud);
-    } catch (error) {
-        manejarError(res, error);
-    }
-}
-
-async function soltarHoras(req, res) {
-    try {
-        const idRepartidor = req.usuario.id_repartidor;
-        const { id } = req.params;
-
-        const resultado = await soltarHorasService(
-            Number(id),
-            idRepartidor
-        );
-
-        res.json(resultado);
     } catch (error) {
         manejarError(res, error);
     }
