@@ -45,6 +45,7 @@ import { iniciarAsignacionAutomatica } from "./servicios/asignacionAutomatica.js
 import buscarPedidosRoutes from "./routes/buscarPedidos.routes.js";
 
 import "./servicios/Generarhorariossemanales.job.js";
+import { iniciarSchedulerEstadosRepartidor } from "./servicios/EstadoRepartidorScheduler.service.js";
 
 config();
 
@@ -127,5 +128,6 @@ app.use((req, res) => {
 });
 
 iniciarAsignacionAutomatica();
+iniciarSchedulerEstadosRepartidor();
 
 export default app;
