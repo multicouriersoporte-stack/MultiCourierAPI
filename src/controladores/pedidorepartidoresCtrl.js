@@ -537,7 +537,7 @@ export const reasignarRepartidor = async (req, res) => {
             return res.status(404).json({ success: false, message: "El pedido no existe." });
         }
 
-        const estadosNoReasignables = ["ENTREGADO", "NO_ENTREGADO"];
+        REGADO", "NO_ENTREGADO"];
         const estadoPedido = String(pedido.estado_nombre || "").trim().toUpperCase();
 
         if (estadosNoReasignables.includes(estadoPedido)) {
@@ -1311,7 +1311,7 @@ export const reasignarRepartidor = async (req, res) => {
             return res.status(404).json({ success: false, message: "El pedido no existe." });
         }
 
-        const estadosNoReasignables = ["ENTREGADO", "NO_ENTREGADO"];
+/*         const estadosNoReasignables = ["ENTREGADO", "NO_ENTREGADO"];
         const estadoPedido = String(pedido.estado_nombre || "").trim().toUpperCase();
 
         if (estadosNoReasignables.includes(estadoPedido)) {
@@ -1319,6 +1319,16 @@ export const reasignarRepartidor = async (req, res) => {
             return res.status(409).json({
                 success: false,
                 message: "No se puede reasignar un pedido finalizado.",
+                estado_actual: pedido.estado_nombre
+            });
+        } */
+        const estadoPedido = String(pedido.estado_nombre || "").trim().toUpperCase();
+
+        if (estadoPedido !== ESTADO_PEDIDO_EN_PREPARACION) {
+            await conexion.rollback();
+            return res.status(409).json({
+                success: false,
+                message: `La reasignación solo está disponible mientras el pedido está en ${ESTADO_PEDIDO_EN_PREPARACION}.`,
                 estado_actual: pedido.estado_nombre
             });
         }
