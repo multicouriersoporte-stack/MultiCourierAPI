@@ -491,6 +491,7 @@ export const asignarRepartidorAutomaticamente = async id_pedido => {
 }; */
 
 // Lista repartidores disponibles para asignación manual (normal o forzada).
+// Query: ?id_pedido=X&forzado=true|false
 export const getRepartidoresDisponiblesAsignacion = async (req, res) => {
     try {
         if (!req.usuario) {
@@ -504,14 +505,18 @@ export const getRepartidoresDisponiblesAsignacion = async (req, res) => {
         }
 
         const { id_pedido, latitud, longitud, forzado } = req.query;
-        const esForzado = String(forzado).toLowerCase() === "true" || forzado === "1" || forzado === true;
+        const esForzado =
+            String(forzado).toLowerCase() === "true" ||
+            forzado === "1" ||
+            forzado === true;
 
         let lat = Number(latitud);
         let lng = Number(longitud);
 
+        // Si se envía id_pedido, tomar coordenadas del local del pedido
         if (esIdValido(id_pedido)) {
             const [pedidos] = await conmysql.query(
-                `SELECT id_pedido, pedido_local_latitud, pedido_local_longitud
+                `SELECT id_pedido, pedido_local_latitud, pedido_local_longitud, id_repartidor
                  FROM pedidos WHERE id_pedido = ? LIMIT 1`,
                 [id_pedido]
             );
@@ -526,15 +531,26 @@ export const getRepartidoresDisponiblesAsignacion = async (req, res) => {
         const parametros = [];
 
         let sql = `
-            SELECT r.id_repartidor, r.id_usuario, r.repartidor_codigo, r.repartidor_placa,
-                   r.repartidor_tipo_vehiculo, r.repartidor_posicion_ranking,
-                   r.repartidor_total_pedidos, r.repartidor_puntos, r.repartidor_calificacion,
-                   r.id_estado_repartidor,
-                   er.estado_repartidor_nombre, er.estado_repartidor_permite_pedidos,
-                   er.estado_repartidor_permite_seleccion,
-                   u.usuario_nombre_completo,
-                   ru.repartidor_ubicacion_latitud, ru.repartidor_ubicacion_longitud,
-                   ru.repartidor_ubicacion_fecha`;
+            SELECT
+                r.id_repartidor,
+                r.id_usuario,
+                r.repartidor_codigo,
+                r.repartidor_placa,
+                r.repartidor_tipo_vehiculo,
+                r.repartidor_posicion_ranking,
+                r.repartidor_total_pedidos,
+                r.repartidor_puntos,
+                r.repartidor_calificacion,
+                r.id_estado_repartidor,
+                er.estado_repartidor_nombre,
+                er.estado_repartidor_permite_pedidos,
+                er.estado_repartidor_permite_seleccion,
+                u.usuario_nombre_completo,
+                u.usuario_telefono,
+                u.usuario_foto,
+                ru.repartidor_ubicacion_latitud,
+                ru.repartidor_ubicacion_longitud,
+                ru.repartidor_ubicacion_fecha`;
 
         if (tieneCoordenadas) {
             sql += `,
@@ -550,19 +566,24 @@ export const getRepartidoresDisponiblesAsignacion = async (req, res) => {
 
         sql += `
             FROM repartidores r
-            INNER JOIN estados_repartidor er ON r.id_estado_repartidor = er.id_estado_repartidor
-            LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario
+            INNER JOIN estados_repartidor er
+                ON r.id_estado_repartidor = er.id_estado_repartidor
+            LEFT JOIN usuarios u
+                ON r.id_usuario = u.id_usuario
             LEFT JOIN (
-                SELECT ru1.* FROM repartidor_ubicaciones ru1
+                SELECT ru1.*
+                FROM repartidor_ubicaciones ru1
                 INNER JOIN (
                     SELECT id_repartidor, MAX(id_repartidor_ubicacion) AS ultima_ubicacion
-                    FROM repartidor_ubicaciones GROUP BY id_repartidor
+                    FROM repartidor_ubicaciones
+                    GROUP BY id_repartidor
                 ) ultima ON ru1.id_repartidor_ubicacion = ultima.ultima_ubicacion
             ) ru ON r.id_repartidor = ru.id_repartidor
             WHERE er.estado_repartidor_estado = 1`;
 
-        // Normal: solo LISTO / REPARTIENDO y que permitan pedidos
-        // Forzado: cualquier estado (LISTO, REPARTIENDO, EN_PEDIDO, EN_PAUSA, DESCONECTADO)
+        // ── Filtro según modo ──────────────────────────────────────────────
+        // Normal  → solo LISTO / REPARTIENDO y que permitan pedidos
+        // Forzado → todos los estados (LISTO, REPARTIENDO, EN_PEDIDO, EN_PAUSA, DESCONECTADO)
         if (!esForzado) {
             sql += `
               AND UPPER(TRIM(er.estado_repartidor_nombre)) IN ('LISTO', 'REPARTIENDO')
@@ -572,10 +593,10 @@ export const getRepartidoresDisponiblesAsignacion = async (req, res) => {
         sql += `
             ORDER BY
               CASE
-                WHEN UPPER(TRIM(er.estado_repartidor_nombre)) = 'LISTO' THEN 1
+                WHEN UPPER(TRIM(er.estado_repartidor_nombre)) = 'LISTO'       THEN 1
                 WHEN UPPER(TRIM(er.estado_repartidor_nombre)) = 'REPARTIENDO' THEN 2
-                WHEN UPPER(TRIM(er.estado_repartidor_nombre)) = 'EN_PEDIDO' THEN 3
-                WHEN UPPER(TRIM(er.estado_repartidor_nombre)) = 'EN_PAUSA' THEN 4
+                WHEN UPPER(TRIM(er.estado_repartidor_nombre)) = 'EN_PEDIDO'   THEN 3
+                WHEN UPPER(TRIM(er.estado_repartidor_nombre)) = 'EN_PAUSA'    THEN 4
                 ELSE 5
               END,
               distancia_km ASC,
@@ -587,7 +608,7 @@ export const getRepartidoresDisponiblesAsignacion = async (req, res) => {
 
         const [rows] = await conmysql.query(sql, parametros);
 
-        // Si hay pedido y ya tiene repartidor, excluirlo de la lista (no reasignar a sí mismo)
+        // Excluir al repartidor ya asignado al pedido (no reasignar a sí mismo)
         let repartidores = rows;
         if (esIdValido(id_pedido)) {
             const [ped] = await conmysql.query(
@@ -596,7 +617,9 @@ export const getRepartidoresDisponiblesAsignacion = async (req, res) => {
             );
             const idActual = ped[0]?.id_repartidor;
             if (idActual != null) {
-                repartidores = rows.filter(r => Number(r.id_repartidor) !== Number(idActual));
+                repartidores = rows.filter(
+                    r => Number(r.id_repartidor) !== Number(idActual)
+                );
             }
         }
 
