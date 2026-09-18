@@ -49,10 +49,6 @@ import {
   getPedidoPorCodigo, getPedidosPorEstado, postPedido, putPedido,
   patchPedido, entregarPedidoConPin, confirmarPagoPedido, deletePedido
 } from "../controladores/pedidosCtrl.js";
-import {
-  getRepartidoresDisponiblesAsignacion, asignarRepartidorManualmente, asignarRepartidorForzado,
-  reasignarRepartidor, reasignarRepartidorForzado, getAsignacionesPedido
-} from "../controladores/pedidorepartidoresCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
 import { cancelarPedido } from "../controladores/pedidosCtrl.js";
@@ -74,13 +70,6 @@ router.get("/pedidos/local/:id_local", verificarToken, permitirRoles("LOCAL", ..
 // Consultas específicas de pedido
 router.get("/pedidos/:id", verificarToken, permitirRoles(...ROLES_GET), getPedidoPorId);
 router.get("/pedidos/:id/detalles", verificarToken, permitirRoles(...ROLES_GET), getPedidoDetalles);
-
-router.get("/repartidores/disponibles-asignacion", verificarToken, getRepartidoresDisponiblesAsignacion);
-router.post("/pedidos/:id_pedido/repartidores", verificarToken, asignarRepartidorManualmente);
-router.post("/pedidos/:id_pedido/repartidores/forzado", verificarToken, asignarRepartidorForzado);
-router.patch("/pedidos/:id_pedido/reasignar", verificarToken, reasignarRepartidor);
-router.patch("/pedidos/:id_pedido/reasignar/forzado", verificarToken, reasignarRepartidorForzado);
-router.get("/pedidos/:id_pedido/repartidores", verificarToken, getAsignacionesPedido);
 
 // Operaciones de actualización y creación
 router.post("/pedidos", verificarToken, permitirRoles("CLIENTE"), postPedido);
