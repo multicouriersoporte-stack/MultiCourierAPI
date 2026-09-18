@@ -51,6 +51,7 @@ import {
 } from "../controladores/pedidosCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
+import { cancelarPedido } from "../controladores/pedidosCtrl.js";
 
 const router = express.Router();
 
@@ -79,5 +80,6 @@ router.patch("/pedidos/:id/confirmar-pago", verificarToken, permitirRoles("SOPOR
 
 // Eliminación de pedidos
 router.delete("/pedidos/:id", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), deletePedido);
+router.patch("/pedidos/:id/cancelar", verificarToken, permitirRoles(...ROLES_GET), cancelarPedido);
 
 export default router;
