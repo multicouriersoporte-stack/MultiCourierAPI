@@ -13,7 +13,7 @@ import { verificarToken } from "../middlewares/auth.middleware.js";
 const router = Router();
 
 // Asignación automática: selecciona el mejor repartidor disponible.
-router.post("/pedidos/:id_pedido/asignar-repartidor", async (req, res) => {
+router.post("/pedidos/:id_pedido/asignar-repartidor", verificarToken, permitirRoles("LOCAL", "CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"), async (req, res) => {
   try {
     const id_pedido = Number(req.params.id_pedido);
     if (!Number.isInteger(id_pedido) || id_pedido <= 0) {
