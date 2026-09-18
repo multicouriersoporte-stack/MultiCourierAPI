@@ -713,6 +713,7 @@ import { conmysql } from "../db.js";
 import { asignarRepartidorAutomaticamente } from "./pedidorepartidoresCtrl.js";
 import { crearPagoLocalDesdePedido } from "./pagoslocalesCtrl.js";
 import { crearPagoRepartidorDesdePedido } from "./pagosrepartidorCtrl.js";
+import { obtenerAsignacionActiva } from "./pedidorepartidoresCtrl.js";
 
 const ROLES_ADMINISTRATIVOS = ["CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"];
 const ROLES_MODIFICAR_PEDIDOS = ["LOCAL", "REPARTIDOR", "CLIENTE", "SOPORTE", "ADMINISTRADOR"];
@@ -1406,6 +1407,112 @@ export const entregarPedidoConPin = async (req, res) => {
     } catch (error) {
         console.error("[Pedidos] Error entregarPedidoConPin:", error);
         return res.status(500).json({ success: false, message: "Error al entregar pedido." });
+    }
+};
+
+const ESTADOS_PEDIDO_NO_CANCELABLES = ["ENTREGADO", "NO_ENTREGADO", "CANCELADO"];
+
+// Cancelación con reglas por rol: CLIENTE/LOCAL/REPARTIDOR solo antes de ser aceptado; SOPORTE/ADMINISTRATIVOS siempre.
+export const cancelarPedido = async (req, res) => {
+    const conexion = await conmysql.getConnection();
+    try {
+        const { id } = req.params;
+        const motivo = req.body?.motivo ? String(req.body.motivo).trim() : null;
+
+        if (!esIdValido(id)) { conexion.release(); return res.status(400).json({ success: false, message: "El ID del pedido no es válido." }); }
+        if (!req.usuario) { conexion.release(); return res.status(401).json({ success: false, message: "Usuario no autenticado." }); }
+
+        await conexion.beginTransaction();
+
+        const [pedidos] = await conexion.query(`
+            SELECT p.*, e.estado_nombre
+            FROM pedidos p LEFT JOIN estados e ON p.id_estado = e.id_estado
+            WHERE p.id_pedido = ? LIMIT 1 FOR UPDATE
+        `, [id]);
+
+        if (!pedidos.length) { await conexion.rollback(); return res.status(404).json({ success: false, message: "Pedido no encontrado." }); }
+
+        const pedido = pedidos[0];
+        const estadoActual = String(pedido.estado_nombre || "").trim().toUpperCase();
+
+        if (ESTADOS_PEDIDO_NO_CANCELABLES.includes(estadoActual)) {
+            await conexion.rollback();
+            return res.status(409).json({ success: false, message: `El pedido está en ${estadoActual} y no puede cancelarse.`, codigo: "PEDIDO_NO_CANCELABLE" });
+        }
+
+        let autorizado = false;
+
+        if (esAdministrativo(req)) {
+            autorizado = true;
+        } else if (tieneRol(req, ["CLIENTE"])) {
+            const id_usuario = obtenerIdUsuario(req);
+            const clienteUsuario = id_usuario ? await obtenerClienteDelUsuario(id_usuario) : null;
+            if (!clienteUsuario || Number(clienteUsuario) !== Number(pedido.id_cliente)) {
+                await conexion.rollback();
+                return res.status(403).json({ success: false, message: "No puedes cancelar el pedido de otro cliente." });
+            }
+            // El LOCAL aún no lo aceptó mientras esté PENDIENTE.
+            autorizado = estadoActual === "PENDIENTE";
+        } else if (tieneRol(req, ["LOCAL"])) {
+            const local = await obtenerLocalDelUsuario(req);
+            if (!local || Number(local.id_local) !== Number(pedido.id_local)) {
+                await conexion.rollback();
+                return res.status(403).json({ success: false, message: "No puedes cancelar pedidos de otro local." });
+            }
+            autorizado = estadoActual === "PENDIENTE";
+        } else if (tieneRol(req, ["REPARTIDOR"])) {
+            const id_repartidor = await obtenerRepartidorDelUsuario(obtenerIdUsuario(req));
+            if (!id_repartidor || Number(pedido.id_repartidor) !== Number(id_repartidor)) {
+                await conexion.rollback();
+                return res.status(403).json({ success: false, message: "No puedes cancelar un pedido que no tienes asignado." });
+            }
+            // Solo si aún no aceptó la oferta (sigue OFERTADO) o no hay asignación activa registrada.
+            const asignacion = await obtenerAsignacionActiva(conexion, id);
+            const estadoAsignacion = String(asignacion?.estado_nombre || "").trim().toUpperCase();
+            autorizado = !asignacion || estadoAsignacion === "OFERTADO";
+        } else {
+            await conexion.rollback();
+            return res.status(403).json({ success: false, message: "Tu rol no tiene permisos para cancelar pedidos." });
+        }
+
+        if (!autorizado) {
+            await conexion.rollback();
+            return res.status(403).json({
+                success: false,
+                codigo: "CANCELACION_NO_PERMITIDA",
+                message: "Ya no puedes cancelar este pedido en este punto del proceso. Contacta a SOPORTE."
+            });
+        }
+
+        const idEstadoCancelado = await obtenerIdEstadoPorNombre("CANCELADO", "PEDIDO");
+        if (!idEstadoCancelado) {
+            await conexion.rollback();
+            return res.status(500).json({ success: false, message: 'No existe el estado "CANCELADO" en la tabla estados. Ejecuta la migración.' });
+        }
+
+        await conexion.query(`
+            UPDATE pedidos
+            SET id_estado=?, pedido_cancelado_motivo=?, pedido_cancelado_por_rol=?, pedido_cancelado_por_usuario=?, pedido_cancelado_fecha=NOW()
+            WHERE id_pedido=?
+        `, [idEstadoCancelado, motivo, obtenerRol(req) || null, obtenerIdUsuario(req) || null, id]);
+
+        await conexion.commit();
+
+        // Libera al repartidor si tenía uno EN_PEDIDO asignado.
+        if (pedido.id_repartidor) {
+            try { await sincronizarEstadoRepartidorTrasEntrega(pedido.id_repartidor); }
+            catch (error) { console.error("[Pedidos] Error liberando repartidor tras cancelación:", error); }
+        }
+
+        const pedidoActualizado = await obtenerPedidoPorIdInterno(id);
+        // TODO (paso 5): emitir notificación a cliente/local/repartidor involucrados.
+        return res.json({ success: true, message: "Pedido cancelado correctamente.", ...ocultarPedidoPin(pedidoActualizado, req) });
+    } catch (error) {
+        try { await conexion.rollback(); } catch (e) { console.error("[Pedidos] Error rollback cancelarPedido:", e); }
+        console.error("[Pedidos] Error cancelarPedido:", error);
+        return res.status(500).json({ success: false, message: "Error al cancelar el pedido." });
+    } finally {
+        conexion.release();
     }
 };
 
