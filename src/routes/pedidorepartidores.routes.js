@@ -1,8 +1,14 @@
 import { Router } from "express";
 import {
-  getRepartidoresDisponiblesAsignacion, asignarRepartidorManualmente, asignarRepartidorForzado,
-  reasignarRepartidor, reasignarRepartidorForzado, getAsignacionesPedido
+  asignarRepartidorAutomaticamente,
+  getRepartidoresDisponiblesAsignacion,
+  asignarRepartidorManualmente,
+  asignarRepartidorForzado,
+  reasignarRepartidor,
+  reasignarRepartidorForzado,
+  getAsignacionesPedido
 } from "../controladores/pedidorepartidoresCtrl.js";
+import { verificarToken } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
