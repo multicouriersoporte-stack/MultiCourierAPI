@@ -477,6 +477,6 @@ export {
     obtenerIdEstadoRepartidorPorNombre,
     marcarRepartidorEnPedido,
     liberarRepartidorSegunTurno,
-    asignarRepartidorForzado,
-    reasignarRepartidorForzado
+    //asignarRepartidorForzado,
+    //reasignarRepartidorForzado
 };
