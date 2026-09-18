@@ -419,7 +419,7 @@ export const asignarRepartidorAutomaticamente = async id_pedido => {
 };
 
 // Lista repartidores disponibles para asignación manual.
-export const getRepartidoresDisponiblesAsignacion = async (req, res) => {
+/* export const getRepartidoresDisponiblesAsignacion = async (req, res) => {
     try {
         if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
         if (!puedeAsignarManualmente(req)) return res.status(403).json({ success: false, message: "No tienes permisos para consultar repartidores disponibles para asignación." });
@@ -487,6 +487,131 @@ export const getRepartidoresDisponiblesAsignacion = async (req, res) => {
     } catch (error) {
         console.error("[PedidoRepartidor] Error repartidores disponibles:", error);
         return res.status(500).json({ success: false, message: "Error al consultar repartidores disponibles." });
+    }
+}; */
+
+// Lista repartidores disponibles para asignación manual (normal o forzada).
+export const getRepartidoresDisponiblesAsignacion = async (req, res) => {
+    try {
+        if (!req.usuario) {
+            return res.status(401).json({ success: false, message: "Usuario no autenticado." });
+        }
+        if (!puedeAsignarManualmente(req)) {
+            return res.status(403).json({
+                success: false,
+                message: "No tienes permisos para consultar repartidores disponibles para asignación."
+            });
+        }
+
+        const { id_pedido, latitud, longitud, forzado } = req.query;
+        const esForzado = String(forzado).toLowerCase() === "true" || forzado === "1" || forzado === true;
+
+        let lat = Number(latitud);
+        let lng = Number(longitud);
+
+        if (esIdValido(id_pedido)) {
+            const [pedidos] = await conmysql.query(
+                `SELECT id_pedido, pedido_local_latitud, pedido_local_longitud
+                 FROM pedidos WHERE id_pedido = ? LIMIT 1`,
+                [id_pedido]
+            );
+            if (!pedidos.length) {
+                return res.status(404).json({ success: false, message: "El pedido no existe." });
+            }
+            lat = Number(pedidos[0].pedido_local_latitud);
+            lng = Number(pedidos[0].pedido_local_longitud);
+        }
+
+        const tieneCoordenadas = Number.isFinite(lat) && Number.isFinite(lng);
+        const parametros = [];
+
+        let sql = `
+            SELECT r.id_repartidor, r.id_usuario, r.repartidor_codigo, r.repartidor_placa,
+                   r.repartidor_tipo_vehiculo, r.repartidor_posicion_ranking,
+                   r.repartidor_total_pedidos, r.repartidor_puntos, r.repartidor_calificacion,
+                   r.id_estado_repartidor,
+                   er.estado_repartidor_nombre, er.estado_repartidor_permite_pedidos,
+                   er.estado_repartidor_permite_seleccion,
+                   u.usuario_nombre_completo,
+                   ru.repartidor_ubicacion_latitud, ru.repartidor_ubicacion_longitud,
+                   ru.repartidor_ubicacion_fecha`;
+
+        if (tieneCoordenadas) {
+            sql += `,
+                (6371 * ACOS(LEAST(1, GREATEST(-1,
+                    COS(RADIANS(?)) * COS(RADIANS(ru.repartidor_ubicacion_latitud)) *
+                    COS(RADIANS(ru.repartidor_ubicacion_longitud) - RADIANS(?)) +
+                    SIN(RADIANS(?)) * SIN(RADIANS(ru.repartidor_ubicacion_latitud))
+                )))) AS distancia_km`;
+            parametros.push(lat, lng, lat);
+        } else {
+            sql += `, NULL AS distancia_km`;
+        }
+
+        sql += `
+            FROM repartidores r
+            INNER JOIN estados_repartidor er ON r.id_estado_repartidor = er.id_estado_repartidor
+            LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario
+            LEFT JOIN (
+                SELECT ru1.* FROM repartidor_ubicaciones ru1
+                INNER JOIN (
+                    SELECT id_repartidor, MAX(id_repartidor_ubicacion) AS ultima_ubicacion
+                    FROM repartidor_ubicaciones GROUP BY id_repartidor
+                ) ultima ON ru1.id_repartidor_ubicacion = ultima.ultima_ubicacion
+            ) ru ON r.id_repartidor = ru.id_repartidor
+            WHERE er.estado_repartidor_estado = 1`;
+
+        // Normal: solo LISTO / REPARTIENDO y que permitan pedidos
+        // Forzado: cualquier estado (LISTO, REPARTIENDO, EN_PEDIDO, EN_PAUSA, DESCONECTADO)
+        if (!esForzado) {
+            sql += `
+              AND UPPER(TRIM(er.estado_repartidor_nombre)) IN ('LISTO', 'REPARTIENDO')
+              AND er.estado_repartidor_permite_pedidos = 1`;
+        }
+
+        sql += `
+            ORDER BY
+              CASE
+                WHEN UPPER(TRIM(er.estado_repartidor_nombre)) = 'LISTO' THEN 1
+                WHEN UPPER(TRIM(er.estado_repartidor_nombre)) = 'REPARTIENDO' THEN 2
+                WHEN UPPER(TRIM(er.estado_repartidor_nombre)) = 'EN_PEDIDO' THEN 3
+                WHEN UPPER(TRIM(er.estado_repartidor_nombre)) = 'EN_PAUSA' THEN 4
+                ELSE 5
+              END,
+              distancia_km ASC,
+              r.repartidor_posicion_ranking ASC,
+              r.repartidor_total_pedidos ASC,
+              r.repartidor_puntos DESC,
+              r.repartidor_calificacion DESC,
+              r.id_repartidor ASC`;
+
+        const [rows] = await conmysql.query(sql, parametros);
+
+        // Si hay pedido y ya tiene repartidor, excluirlo de la lista (no reasignar a sí mismo)
+        let repartidores = rows;
+        if (esIdValido(id_pedido)) {
+            const [ped] = await conmysql.query(
+                `SELECT id_repartidor FROM pedidos WHERE id_pedido = ? LIMIT 1`,
+                [id_pedido]
+            );
+            const idActual = ped[0]?.id_repartidor;
+            if (idActual != null) {
+                repartidores = rows.filter(r => Number(r.id_repartidor) !== Number(idActual));
+            }
+        }
+
+        return res.json({
+            success: true,
+            forzado: esForzado,
+            total: repartidores.length,
+            repartidores
+        });
+    } catch (error) {
+        console.error("[PedidoRepartidor] Error repartidores disponibles:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error al consultar repartidores disponibles."
+        });
     }
 };
 
