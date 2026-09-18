@@ -1,12 +1,5 @@
 import { Router } from "express";
 import {
-  asignarRepartidorAutomaticamente,
-  asignarRepartidorManualmente,
-  reasignarRepartidor,
-  getRepartidoresDisponiblesAsignacion,
-  getAsignacionesPedido
-} from "../controladores/pedidorepartidoresCtrl.js";
-import {
   getRepartidoresDisponiblesAsignacion, asignarRepartidorManualmente, asignarRepartidorForzado,
   reasignarRepartidor, reasignarRepartidorForzado, getAsignacionesPedido
 } from "../controladores/pedidorepartidoresCtrl.js";
