@@ -887,12 +887,31 @@ const verificarAccesoCliente = async (req, res, id_cliente) => {
     return false;
 };
 
-const obtenerPedidoPorIdInterno = async id_pedido => {
+/* const obtenerPedidoPorIdInterno = async id_pedido => {
     const [pedidos] = await conmysql.query(`
         SELECT p.*,c.cliente_codigo,c.id_usuario AS cliente_id_usuario,u.usuario_cedula AS cliente_cedula,u.usuario_nombre AS cliente_nombre,u.usuario_apellido AS cliente_apellido,u.usuario_nombre_completo AS cliente_nombre_completo,u.usuario_email AS cliente_email,u.usuario_telefono AS cliente_telefono,
         l.local_codigo,l.local_nombre_comercial,l.local_razon_social,l.local_telefono,l.local_email,e.estado_nombre,mp.metodo_pago_nombre,mp.metodo_pago_descripcion,
         r.id_repartidor,r.id_usuario AS repartidor_id_usuario,r.repartidor_codigo,r.repartidor_placa,r.repartidor_tipo_vehiculo,r.repartidor_calificacion,r.repartidor_posicion_ranking,r.repartidor_total_pedidos,r.repartidor_pedidos_aceptados,r.repartidor_pedidos_rechazados,r.repartidor_porcentaje_aceptacion,
         ur.usuario_nombre AS repartidor_nombre,ur.usuario_apellido AS repartidor_apellido,ur.usuario_nombre_completo AS repartidor_nombre_completo,ur.usuario_telefono AS repartidor_telefono
+        FROM pedidos p
+        LEFT JOIN clientes c ON p.id_cliente=c.id_cliente
+        LEFT JOIN usuarios u ON c.id_usuario=u.id_usuario
+        LEFT JOIN locales l ON p.id_local=l.id_local
+        LEFT JOIN estados e ON p.id_estado=e.id_estado
+        LEFT JOIN metodos_pago mp ON p.id_metodo_pago=mp.id_metodo_pago
+        LEFT JOIN repartidores r ON p.id_repartidor=r.id_repartidor
+        LEFT JOIN usuarios ur ON r.id_usuario=ur.id_usuario
+        WHERE p.id_pedido=? LIMIT 1
+    `, [id_pedido]);
+    return pedidos.length ? pedidos[0] : null;
+}; */
+
+const obtenerPedidoPorIdInterno = async id_pedido => {
+    const [pedidos] = await conmysql.query(`
+        SELECT p.*,c.cliente_codigo,c.id_usuario AS cliente_id_usuario,u.usuario_cedula AS cliente_cedula,u.usuario_nombre AS cliente_nombre,u.usuario_apellido AS cliente_apellido,u.usuario_nombre_completo AS cliente_nombre_completo,u.usuario_email AS cliente_email,u.usuario_telefono AS cliente_telefono,
+        l.local_codigo,l.local_nombre_comercial,l.local_razon_social,l.local_telefono,l.local_email,e.estado_nombre,mp.metodo_pago_nombre,mp.metodo_pago_descripcion,
+        r.id_repartidor,r.id_usuario AS repartidor_id_usuario,r.repartidor_codigo,r.repartidor_placa,r.repartidor_tipo_vehiculo,r.repartidor_calificacion,r.repartidor_posicion_ranking,r.repartidor_total_pedidos,r.repartidor_pedidos_aceptados,r.repartidor_pedidos_rechazados,r.repartidor_porcentaje_aceptacion,
+        ur.usuario_nombre AS repartidor_nombre,ur.usuario_apellido AS repartidor_apellido,ur.usuario_nombre_completo AS repartidor_nombre_completo,ur.usuario_telefono AS repartidor_telefono,ur.usuario_foto AS repartidor_foto
         FROM pedidos p
         LEFT JOIN clientes c ON p.id_cliente=c.id_cliente
         LEFT JOIN usuarios u ON c.id_usuario=u.id_usuario
@@ -931,7 +950,7 @@ export const getPedidos = async (req, res) => {
             `);
             return res.json(ocultarPedidosPin(result, req));
         }
-        if (tieneRol(req, ["LOCAL"])) {
+/*         if (tieneRol(req, ["LOCAL"])) {
             const local = await obtenerLocalDelUsuario(req);
             if (!local) return res.status(403).json({ success: false, message: "El usuario LOCAL no tiene un registro asociado en la tabla locales." });
             const [result] = await conmysql.query(`
@@ -941,7 +960,27 @@ export const getPedidos = async (req, res) => {
                 WHERE p.id_local=? ORDER BY p.id_pedido DESC
             `, [local.id_local]);
             return res.json(ocultarPedidosPin(result, req));
-        }
+        } */
+      if (tieneRol(req, ["LOCAL"])) {
+        const local = await obtenerLocalDelUsuario(req);
+        if (!local) return res.status(403).json({ success: false, message: "El usuario LOCAL no tiene un registro asociado en la tabla locales." });
+        const [result] = await conmysql.query(`
+            SELECT p.*,c.cliente_codigo,u.usuario_nombre AS cliente_nombre,u.usuario_apellido AS cliente_apellido,u.usuario_nombre_completo AS cliente_nombre_completo,u.usuario_email AS cliente_email,u.usuario_telefono AS cliente_telefono,
+            l.local_codigo,l.local_nombre_comercial,l.local_razon_social,l.local_telefono,l.local_email,e.estado_nombre,mp.metodo_pago_nombre,mp.metodo_pago_descripcion,
+            r.repartidor_codigo,r.repartidor_placa,r.repartidor_tipo_vehiculo,r.repartidor_calificacion,
+            ur.usuario_nombre_completo AS repartidor_nombre_completo,ur.usuario_telefono AS repartidor_telefono,ur.usuario_foto AS repartidor_foto
+            FROM pedidos p
+            LEFT JOIN clientes c ON p.id_cliente=c.id_cliente
+            LEFT JOIN usuarios u ON c.id_usuario=u.id_usuario
+            INNER JOIN locales l ON p.id_local=l.id_local
+            LEFT JOIN estados e ON p.id_estado=e.id_estado
+            LEFT JOIN metodos_pago mp ON p.id_metodo_pago=mp.id_metodo_pago
+            LEFT JOIN repartidores r ON p.id_repartidor=r.id_repartidor
+            LEFT JOIN usuarios ur ON r.id_usuario=ur.id_usuario
+            WHERE p.id_local=? ORDER BY p.id_pedido DESC
+        `, [local.id_local]);
+        return res.json(ocultarPedidosPin(result, req));
+    }
         if (tieneRol(req, ["CLIENTE"])) {
             if (!id_usuario) return res.status(401).json({ success: false, message: "No se pudo identificar al usuario." });
             const id_cliente = await obtenerClienteDelUsuario(id_usuario);
