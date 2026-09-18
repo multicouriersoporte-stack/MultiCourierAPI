@@ -33,18 +33,6 @@ router.post("/pedidos/:id_pedido/asignar-repartidor", async (req, res) => {
   }
 });
 
-// Lista repartidores disponibles para asignación manual.
-router.get("/repartidores/disponibles-asignacion", getRepartidoresDisponiblesAsignacion);
-
-// Asignación manual mediante id_repartidor.
-router.post("/pedidos/:id_pedido/asignar-repartidor-manual", asignarRepartidorManualmente);
-
-// Reasignación de repartidor; requiere permisos de SOPORTE o ADMINISTRADOR.
-router.post("/pedidos/:id_pedido/reasignar-repartidor", reasignarRepartidor);
-
-// Historial de asignaciones del pedido.
-router.get("/pedidos/:id_pedido/asignaciones-repartidor", getAsignacionesPedido);
-
 router.get("/repartidores/disponibles-asignacion", verificarToken, getRepartidoresDisponiblesAsignacion);
 router.post("/pedidos/:id_pedido/repartidores", verificarToken, asignarRepartidorManualmente);
 router.post("/pedidos/:id_pedido/repartidores/forzado", verificarToken, asignarRepartidorForzado);
