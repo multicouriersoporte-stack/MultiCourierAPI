@@ -979,8 +979,8 @@ export const getPedidos = async (req, res) => {
             LEFT JOIN usuarios ur ON r.id_usuario=ur.id_usuario
             WHERE p.id_local=? ORDER BY p.id_pedido DESC
         `, [local.id_local]);
-        return res.json(ocultarPedidosPin(result, req)); */
-    }
+        return res.json(ocultarPedidosPin(result, req));
+    } */
         if (tieneRol(req, ["CLIENTE"])) {
             if (!id_usuario) return res.status(401).json({ success: false, message: "No se pudo identificar al usuario." });
             const id_cliente = await obtenerClienteDelUsuario(id_usuario);
