@@ -950,7 +950,7 @@ export const getPedidos = async (req, res) => {
             `);
             return res.json(ocultarPedidosPin(result, req));
         }
-        if (tieneRol(req, ["LOCAL"])) {
+/*         if (tieneRol(req, ["LOCAL"])) {
             const local = await obtenerLocalDelUsuario(req);
             if (!local) return res.status(403).json({ success: false, message: "El usuario LOCAL no tiene un registro asociado en la tabla locales." });
             const [result] = await conmysql.query(`
@@ -960,8 +960,8 @@ export const getPedidos = async (req, res) => {
                 WHERE p.id_local=? ORDER BY p.id_pedido DESC
             `, [local.id_local]);
             return res.json(ocultarPedidosPin(result, req));
-        }
-/*       if (tieneRol(req, ["LOCAL"])) {
+        } */
+      if (tieneRol(req, ["LOCAL"])) {
         const local = await obtenerLocalDelUsuario(req);
         if (!local) return res.status(403).json({ success: false, message: "El usuario LOCAL no tiene un registro asociado en la tabla locales." });
         const [result] = await conmysql.query(`
@@ -980,7 +980,7 @@ export const getPedidos = async (req, res) => {
             WHERE p.id_local=? ORDER BY p.id_pedido DESC
         `, [local.id_local]);
         return res.json(ocultarPedidosPin(result, req));
-    } */
+    }
         if (tieneRol(req, ["CLIENTE"])) {
             if (!id_usuario) return res.status(401).json({ success: false, message: "No se pudo identificar al usuario." });
             const id_cliente = await obtenerClienteDelUsuario(id_usuario);
