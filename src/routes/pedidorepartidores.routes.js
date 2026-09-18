@@ -6,6 +6,10 @@ import {
   getRepartidoresDisponiblesAsignacion,
   getAsignacionesPedido
 } from "../controladores/pedidorepartidoresCtrl.js";
+import {
+  getRepartidoresDisponiblesAsignacion, asignarRepartidorManualmente, asignarRepartidorForzado,
+  reasignarRepartidor, reasignarRepartidorForzado, getAsignacionesPedido
+} from "../controladores/pedidorepartidoresCtrl.js";
 
 const router = Router();
 
@@ -40,5 +44,12 @@ router.post("/pedidos/:id_pedido/reasignar-repartidor", reasignarRepartidor);
 
 // Historial de asignaciones del pedido.
 router.get("/pedidos/:id_pedido/asignaciones-repartidor", getAsignacionesPedido);
+
+router.get("/repartidores/disponibles-asignacion", verificarToken, getRepartidoresDisponiblesAsignacion);
+router.post("/pedidos/:id_pedido/repartidores", verificarToken, asignarRepartidorManualmente);
+router.post("/pedidos/:id_pedido/repartidores/forzado", verificarToken, asignarRepartidorForzado);
+router.patch("/pedidos/:id_pedido/reasignar", verificarToken, reasignarRepartidor);
+router.patch("/pedidos/:id_pedido/reasignar/forzado", verificarToken, reasignarRepartidorForzado);
+router.get("/pedidos/:id_pedido/repartidores", verificarToken, getAsignacionesPedido);
 
 export default router;
