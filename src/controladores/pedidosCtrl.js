@@ -812,8 +812,11 @@ const obtenerMetodoPagoPorId = async id_metodo_pago => {
     return rows.length ? rows[0] : null;
 };
 
-const esMetodoBilletera = metodoPago => Number(metodoPago?.id_metodo_pago) === 5;
+const ID_METODO_PAGO_TARJETA = 3;
 const esMetodoTransferencia = metodoPago => !!metodoPago && String(metodoPago.metodo_pago_nombre || "").trim().toUpperCase() === "TRANSFERENCIA";
+const esMetodoTarjeta = metodoPago => Number(metodoPago?.id_metodo_pago) === ID_METODO_PAGO_TARJETA;
+const esMetodoBilletera = metodoPago => Number(metodoPago?.id_metodo_pago) === 5;
+const requierePagoConfirmado = metodoPago => esMetodoTransferencia(metodoPago) || esMetodoTarjeta(metodoPago);
 
 // Libera al repartidor de EN_PEDIDO y respeta la vigencia de su turno actual.
 const sincronizarEstadoRepartidorTrasEntrega = async id_repartidor => {
@@ -846,9 +849,21 @@ const validarTransicionEstado = async (req, pedido, nuevoIdEstado) => {
     const rolesPermitidos = transiciones[nuevoEstado];
     if (!rolesPermitidos) return { valido: false, status: 403, message: `No se permite cambiar el pedido de ${estadoActual} a ${nuevoEstado}.` };
     if (!tieneRol(req, rolesPermitidos)) return { valido: false, status: 403, message: `El rol ${obtenerRol(req) || "SIN_ROL"} no puede cambiar el estado de ${estadoActual} a ${nuevoEstado}.` };
-    if (estadoActual === "PENDIENTE" && nuevoEstado === "EN_PREPARACION") {
+/*     if (estadoActual === "PENDIENTE" && nuevoEstado === "EN_PREPARACION") {
         const esTransferencia = String(pedido.metodo_pago_nombre || "").trim().toUpperCase() === "TRANSFERENCIA";
         if (esTransferencia && Number(pedido.pedido_pago_confirmado) !== 1) return { valido: false, status: 403, codigo: "PAGO_TRANSFERENCIA_PENDIENTE", message: "El pedido utiliza TRANSFERENCIA y el pago todavía no ha sido confirmado por SOPORTE o ADMINISTRADOR." };
+    } */
+    if (estadoActual === "PENDIENTE" && nuevoEstado === "EN_PREPARACION") {
+      const esTransferencia = String(pedido.metodo_pago_nombre || "").trim().toUpperCase() === "TRANSFERENCIA";
+      const esTarjeta = Number(pedido.id_metodo_pago) === ID_METODO_PAGO_TARJETA;
+        if ((esTransferencia || esTarjeta) && Number(pedido.pedido_pago_confirmado) !== 1) {
+            return {
+                valido: false,
+                status: 403,
+                codigo: "PAGO_PENDIENTE_CONFIRMACION",
+                message: `El pedido utiliza ${esTarjeta ? "TARJETA" : "TRANSFERENCIA"} y el pago todavía no ha sido confirmado por SOPORTE o ADMINISTRADOR.`
+            };
+        }
     }
     return { valido: true, mismoEstado: false, estadoActual, nuevoEstado };
 };
@@ -978,7 +993,15 @@ export const getPedidos = async (req, res) => {
             LEFT JOIN metodos_pago mp ON p.id_metodo_pago=mp.id_metodo_pago
             LEFT JOIN repartidores r ON p.id_repartidor=r.id_repartidor
             LEFT JOIN usuarios ur ON r.id_usuario=ur.id_usuario
-            WHERE p.id_local=? ORDER BY p.id_pedido DESC
+            WHERE p.id_local=?
+              AND (
+                p.pedido_pago_confirmado = 1
+                OR (
+                  UPPER(TRIM(COALESCE(mp.metodo_pago_nombre,''))) <> 'TRANSFERENCIA'
+                  AND COALESCE(p.id_metodo_pago,0) <> 3
+                )
+              )
+            ORDER BY p.id_pedido DESC
         `, [local.id_local]);
         return res.json(ocultarPedidosPin(result, req));
     }
@@ -1090,7 +1113,15 @@ export const getPedidosPorLocal = async (req, res) => {
         const [result] = await conmysql.query(`
             SELECT p.*,c.cliente_codigo,u.usuario_nombre AS cliente_nombre,u.usuario_apellido AS cliente_apellido,u.usuario_nombre_completo AS cliente_nombre_completo,u.usuario_email AS cliente_email,u.usuario_telefono AS cliente_telefono,l.local_codigo,l.local_nombre_comercial,l.local_razon_social,l.local_telefono,l.local_email,e.estado_nombre,mp.metodo_pago_nombre,mp.metodo_pago_descripcion,r.repartidor_codigo
             FROM pedidos p LEFT JOIN clientes c ON p.id_cliente=c.id_cliente LEFT JOIN usuarios u ON c.id_usuario=u.id_usuario INNER JOIN locales l ON p.id_local=l.id_local LEFT JOIN estados e ON p.id_estado=e.id_estado LEFT JOIN metodos_pago mp ON p.id_metodo_pago=mp.id_metodo_pago LEFT JOIN repartidores r ON p.id_repartidor=r.id_repartidor
-            WHERE p.id_local=? ORDER BY p.id_pedido DESC
+            WHERE p.id_local=?
+              AND (
+                p.pedido_pago_confirmado = 1
+                OR (
+                  UPPER(TRIM(COALESCE(mp.metodo_pago_nombre,''))) <> 'TRANSFERENCIA'
+                  AND COALESCE(p.id_metodo_pago,0) <> 3
+                )
+              )
+            ORDER BY p.id_pedido DESC
         `, [id_local]);
         return res.json(ocultarPedidosPin(result, req));
     } catch (error) {
@@ -1197,9 +1228,11 @@ export const postPedido = async (req, res) => {
         const metodoPago = await obtenerMetodoPagoPorId(id_metodo_pago);
         if (!metodoPago) throw new Error("El método de pago no existe.");
         if (Number(metodoPago.metodo_pago_estado) !== 1) throw new Error("El método de pago está inactivo.");
-        const esBilletera = esMetodoBilletera(metodoPago);
         const esTransferencia = esMetodoTransferencia(metodoPago);
-        const pagoConfirmadoInicial = esTransferencia ? 0 : 1;
+        const esTarjeta = esMetodoTarjeta(metodoPago);
+        const esBilletera = esMetodoBilletera(metodoPago);
+        //const pagoConfirmadoInicial = esTransferencia ? 0 : 1;
+        const pagoConfirmadoInicial = requierePagoConfirmado(metodoPago) ? 0 : 1;
         const [ultimo] = await conexion.query(`SELECT pedido_codigo FROM pedidos ORDER BY id_pedido DESC LIMIT 1 FOR UPDATE`);
         let billeteraCliente = null;
 
@@ -1264,7 +1297,14 @@ export const postPedido = async (req, res) => {
             id_metodo_pago: pedidoFinal?.id_metodo_pago ?? id_metodo_pago,
             metodo_pago_nombre: pedidoFinal?.metodo_pago_nombre ?? null,
             pedido_pago_confirmado: Number(pedidoFinal?.pedido_pago_confirmado ?? pagoConfirmadoInicial),
-            message: esTransferencia ? "Pedido registrado. La transferencia queda pendiente de confirmación por SOPORTE o ADMINISTRADOR." : esBilletera ? "Pedido registrado y pagado con Billetera." : "Pedido registrado con éxito",
+            //message: esTransferencia ? "Pedido registrado. La transferencia queda pendiente de confirmación por SOPORTE o ADMINISTRADOR." : esBilletera ? "Pedido registrado y pagado con Billetera." : "Pedido registrado con éxito",
+            message: esTransferencia
+                ? "Pedido registrado. La transferencia queda pendiente de confirmación por SOPORTE o ADMINISTRADOR."
+                : esTarjeta
+                    ? "Pedido registrado. El pago con tarjeta queda pendiente de confirmación por SOPORTE o ADMINISTRADOR."
+                    : esBilletera
+                        ? "Pedido registrado y pagado con Billetera."
+                        : "Pedido registrado con éxito",
             detalles: detallesRegistrados,
             pedido_pin
         });
@@ -1513,6 +1553,54 @@ export const cancelarPedido = async (req, res) => {
         return res.status(500).json({ success: false, message: "Error al cancelar el pedido." });
     } finally {
         conexion.release();
+    }
+};
+
+// Lista pedidos cancelados con filtros, solo para roles administrativos.
+export const getPedidosCancelados = async (req, res) => {
+    try {
+        if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
+        if (!esAdministrativo(req)) return res.status(403).json({ success: false, message: "No tienes permisos para consultar pedidos cancelados." });
+
+        const idEstadoCancelado = await obtenerIdEstadoPorNombre("CANCELADO", "PEDIDO");
+        if (!idEstadoCancelado) return res.json({ success: true, total: 0, pedidos: [] });
+
+        const { fecha_desde, fecha_hasta, id_local, id_cliente, id_repartidor, motivo, cancelado_por_rol } = req.query;
+        const condiciones = ["p.id_estado = ?"];
+        const valores = [idEstadoCancelado];
+
+        if (fecha_desde) { condiciones.push("p.pedido_cancelado_fecha >= ?"); valores.push(`${fecha_desde} 00:00:00`); }
+        if (fecha_hasta) { condiciones.push("p.pedido_cancelado_fecha <= ?"); valores.push(`${fecha_hasta} 23:59:59`); }
+        if (esIdValido(id_local)) { condiciones.push("p.id_local = ?"); valores.push(id_local); }
+        if (esIdValido(id_cliente)) { condiciones.push("p.id_cliente = ?"); valores.push(id_cliente); }
+        if (esIdValido(id_repartidor)) { condiciones.push("p.id_repartidor = ?"); valores.push(id_repartidor); }
+        if (motivo && String(motivo).trim()) { condiciones.push("p.pedido_cancelado_motivo LIKE ?"); valores.push(`%${String(motivo).trim()}%`); }
+        if (cancelado_por_rol && String(cancelado_por_rol).trim()) { condiciones.push("UPPER(p.pedido_cancelado_por_rol) = ?"); valores.push(String(cancelado_por_rol).trim().toUpperCase()); }
+
+        const [result] = await conmysql.query(`
+            SELECT p.*,
+                   c.cliente_codigo, u.usuario_nombre_completo AS cliente_nombre, u.usuario_telefono AS cliente_telefono,
+                   l.local_codigo, l.local_nombre_comercial,
+                   e.estado_nombre, mp.metodo_pago_nombre,
+                   r.repartidor_codigo, ur.usuario_nombre_completo AS repartidor_nombre_completo,
+                   uc.usuario_nombre_completo AS cancelado_por_nombre
+            FROM pedidos p
+            LEFT JOIN clientes c ON p.id_cliente=c.id_cliente
+            LEFT JOIN usuarios u ON c.id_usuario=u.id_usuario
+            LEFT JOIN locales l ON p.id_local=l.id_local
+            LEFT JOIN estados e ON p.id_estado=e.id_estado
+            LEFT JOIN metodos_pago mp ON p.id_metodo_pago=mp.id_metodo_pago
+            LEFT JOIN repartidores r ON p.id_repartidor=r.id_repartidor
+            LEFT JOIN usuarios ur ON r.id_usuario=ur.id_usuario
+            LEFT JOIN usuarios uc ON p.pedido_cancelado_por_usuario=uc.id_usuario
+            WHERE ${condiciones.join(" AND ")}
+            ORDER BY p.pedido_cancelado_fecha DESC, p.id_pedido DESC
+        `, valores);
+
+        return res.json({ success: true, total: result.length, pedidos: ocultarPedidosPin(result, req) });
+    } catch (error) {
+        console.error("[Pedidos] Error getPedidosCancelados:", error);
+        return res.status(500).json({ success: false, message: "Error al consultar pedidos cancelados." });
     }
 };
 
