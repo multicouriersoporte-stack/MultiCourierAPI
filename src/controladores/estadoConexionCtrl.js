@@ -1,6 +1,6 @@
 import { conmysql } from "../db.js";
 import { calcularEstadoConexion, conectarRepartidor, sincronizarListoARepartiendo } from "../servicios/EstadoConexion.service.js";
-import { obtenerIdUsuario, obtenerRepartidorDelUsuario } from "./pedidosCtrl.js";
+import { obtenerIdUsuario, obtenerRepartidorDelUsuario } from "./controladores/pedidosCtrl.js";
 
 const ERRORES_HTTP = { NO_EXISTE: 404, ESTADO_INVALIDO: 409, SIN_HORARIO: 409, FUERA_DE_VENTANA: 409 };
 
