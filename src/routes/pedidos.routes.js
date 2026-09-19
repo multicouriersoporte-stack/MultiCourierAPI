@@ -46,7 +46,7 @@ export default router;
 import express from "express";
 import {
   getPedidos, getPedidoPorId, getPedidoDetalles, getPedidosPorCliente, getPedidosPorLocal,
-  getPedidoPorCodigo, getPedidosPorEstado, postPedido, putPedido,
+  getPedidoPorCodigo, getPedidosPorEstado, postPedido, putPedido, getPedidosCancelados,
   patchPedido, entregarPedidoConPin, confirmarPagoPedido, cancelarPedido, deletePedido
 } from "../controladores/pedidosCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
