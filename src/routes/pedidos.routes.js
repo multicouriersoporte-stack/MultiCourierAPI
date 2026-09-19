@@ -47,7 +47,7 @@ import express from "express";
 import {
   getPedidos, getPedidoPorId, getPedidoDetalles, getPedidosPorCliente, getPedidosPorLocal,
   getPedidoPorCodigo, getPedidosPorEstado, postPedido, putPedido,
-  patchPedido, entregarPedidoConPin, confirmarPagoPedido, deletePedido
+  patchPedido, entregarPedidoConPin, confirmarPagoPedido, cancelarPedido, deletePedido
 } from "../controladores/pedidosCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
@@ -66,6 +66,8 @@ router.get("/pedidos/estado/:id_estado", verificarToken, permitirRoles(...ROLES_
 router.get("/pedidos/cliente/:id_cliente", verificarToken, permitirRoles(...ROLES_ADMIN), getPedidosPorCliente);
 router.get("/clientes/:id_cliente/pedidos", verificarToken, permitirRoles(...ROLES_ADMIN), getPedidosPorCliente);
 router.get("/pedidos/local/:id_local", verificarToken, permitirRoles("LOCAL", ...ROLES_ADMIN), getPedidosPorLocal);
+
+router.get("/pedidos/cancelados", verificarToken, permitirRoles(...ROLES_ADMIN), getPedidosCancelados);
 
 // Consultas específicas de pedido
 router.get("/pedidos/:id", verificarToken, permitirRoles(...ROLES_GET), getPedidoPorId);
