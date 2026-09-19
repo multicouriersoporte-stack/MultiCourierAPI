@@ -9,6 +9,7 @@ import {
   getAsignacionesPedido
 } from "../controladores/pedidorepartidoresCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
+import { permitirRoles } from "../middlewares/roles.middleware.js";
 
 const router = Router();
 
