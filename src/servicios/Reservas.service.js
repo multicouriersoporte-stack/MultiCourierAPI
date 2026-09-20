@@ -284,6 +284,7 @@ export async function soltarHoras(idReserva, idRepartidor) {
 
 
 import { conmysql } from "../db.js";
+import { instanteUtcDesdeHoraEcuador } from "../utils/horarioTiempo.js";
 
 // Configuración de solicitudes.
 const VENTANA_RESOLUCION_MS = 800;
@@ -291,13 +292,16 @@ const MINUTOS_ANTICIPACION_MINIMA = 15;
 const timersPorHorario = new Map();
 
 // Construye el inicio del turno usando la hora local del servidor, sin conversión UTC.
-function calcularInicioTurno(horario) {
+/* function calcularInicioTurno(horario) {
     const fecha = typeof horario.horario_fecha === "string"
         ? horario.horario_fecha.slice(0, 10)
         : `${horario.horario_fecha.getFullYear()}-${String(horario.horario_fecha.getMonth() + 1).padStart(2, "0")}-${String(horario.horario_fecha.getDate()).padStart(2, "0")}`;
     const [anio, mes, dia] = fecha.split("-").map(Number);
     const [hora, minuto, segundo = 0] = String(horario.horario_hora_inicio).split(":").map(Number);
     return new Date(anio, mes - 1, dia, hora, minuto, segundo);
+} */
+function calcularInicioTurno(horario) {
+    return instanteUtcDesdeHoraEcuador(horario.horario_fecha, horario.horario_hora_inicio);
 }
 
 // Calcula las horas acumuladas de las reservas activas.
