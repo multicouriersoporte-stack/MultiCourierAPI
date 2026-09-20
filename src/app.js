@@ -44,6 +44,9 @@ import billeteraclientemovimientoRoutes from "./routes/billeteracliente_movimien
 import { iniciarAsignacionAutomatica } from "./servicios/asignacionAutomatica.js";
 import buscarPedidosRoutes from "./routes/buscarPedidos.routes.js";
 
+import pushRoutes from "./routes/push.routes.js";
+import notificacionesRoutes from "./routes/notificaciones.routes.js";
+
 import "./servicios/Generarhorariossemanales.job.js";
 import { iniciarSchedulerEstadosRepartidor } from "./servicios/EstadoRepartidorScheduler.service.js";
 
@@ -110,6 +113,9 @@ app.use("/api", billeteraclienteRoutes);
 app.use("/api", billeteraclientemovimientoRoutes);
 
 app.use("/api", buscarPedidosRoutes);
+
+app.use("/api", pushRoutes);
+app.use("/api", notificacionesRoutes);
 
 // PRUEBA API
 app.get("/api", (req, res) => {
