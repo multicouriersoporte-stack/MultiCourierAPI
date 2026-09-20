@@ -20,7 +20,6 @@ router.get("/horarios/historial", verificarToken, SOLO_REPARTIDOR, listarHistori
 router.get("/repartidores/estado-conexion", verificarToken, SOLO_REPARTIDOR, getEstadoConexion);
 router.post("/repartidores/conectar", verificarToken, SOLO_REPARTIDOR, postConectar);
 router.get("/horarios/estado-conexion", verificarToken, SOLO_REPARTIDOR, getEstadoConexion);
-router.post("/repartidores/conectar", verificarToken, SOLO_REPARTIDOR, postConectar);
 
 // Reservas
 router.post("/horarios/:id/solicitar", verificarToken, SOLO_REPARTIDOR, solicitarReserva);
