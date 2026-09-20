@@ -11,7 +11,7 @@ async function resolverIdRepartidor(req, res) {
     return idRepartidor;
 }
 
-export const getEstadoConexion = async (req, res) => {
+export const getEstadoConexionxd = async (req, res) => {
     try {
         const idRepartidor = await resolverIdRepartidor(req, res);
         if (!idRepartidor) return;
@@ -25,7 +25,7 @@ export const getEstadoConexion = async (req, res) => {
     }
 };
 
-export const postConectar = async (req, res) => {
+export const postConectarxd = async (req, res) => {
     try {
         const idRepartidor = await resolverIdRepartidor(req, res);
         if (!idRepartidor) return;
