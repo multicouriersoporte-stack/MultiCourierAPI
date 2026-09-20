@@ -4,42 +4,16 @@ import { instanteUtcDesdeHoraEcuador } from "../utils/horarioTiempo.js";
 const ESTADO_REPARTIDOR = { LISTO: 1, REPARTIENDO: 2, EN_PEDIDO: 3, EN_PAUSA: 4, DESCONECTADO: 5, INHABILITADO: 6 };
 const MINUTOS_ANTICIPACION_MINIMA = 15;
 
-function partesFecha(horarioFecha) {
-    return typeof horarioFecha === "string"
-        ? horarioFecha.slice(0, 10)
-        : `${horarioFecha.getFullYear()}-${String(horarioFecha.getMonth() + 1).padStart(2, "0")}-${String(horarioFecha.getDate()).padStart(2, "0")}`;
-}
-
-function combinarFechaHora(horarioFecha, horaTexto) {
-    const [anio, mes, dia] = partesFecha(horarioFecha).split("-").map(Number);
-    const [hora, minuto, segundo = 0] = String(horaTexto).split(":").map(Number);
-    return new Date(anio, mes - 1, dia, hora, minuto, segundo);
-}
-
-/* const calcularInicioTurno = h => combinarFechaHora(h.horario_fecha, h.horario_hora_inicio);
-const calcularFinTurno = h => combinarFechaHora(h.horario_fecha, h.horario_hora_fin); */
 const calcularInicioTurno = h => instanteUtcDesdeHoraEcuador(h.horario_fecha, h.horario_hora_inicio);
 const calcularFinTurno = h => instanteUtcDesdeHoraEcuador(h.horario_fecha, h.horario_hora_fin);
-
-async function obtenerHorariosVigentesHoy(conn, idRepartidor) {
-    const [horarios] = await conn.query(
-        `SELECT hr.id_reserva, hd.horario_fecha, hd.horario_hora_inicio, hd.horario_hora_fin
-         FROM horario_reservas hr
-         INNER JOIN horarios_disponibles hd ON hd.id_horario_disponible = hr.id_horario_disponible
-         WHERE hr.id_repartidor = ? AND hr.reserva_estado = 1 AND hd.horario_fecha = CURDATE()
-         ORDER BY hd.horario_hora_inicio ASC`,
-        [idRepartidor]
-    );
-    const ahora = new Date();
-    return horarios.filter(h => calcularFinTurno(h) > ahora);
-}
 
 function elegirHorarioRelevante(vigentes, ahora) {
     const enCursoAhora = vigentes.find(h => calcularInicioTurno(h) <= ahora && calcularFinTurno(h) > ahora);
     return enCursoAhora || vigentes.find(h => calcularInicioTurno(h) > ahora) || vigentes[0] || null;
 }
 
-// Estado calculado con hora del servidor, para pintar el widget "Conectarse".
+// Estado calculado en base a hora real (UTC), útil para pintar el widget "Conectarse".
+// Nunca conecta a nadie: es solo lectura.
 export async function obtenerEstadoConexion(idRepartidor) {
     const [[repartidor]] = await conmysql.query(
         `SELECT id_estado_repartidor FROM repartidores WHERE id_repartidor = ? LIMIT 1`,
@@ -48,17 +22,28 @@ export async function obtenerEstadoConexion(idRepartidor) {
     if (!repartidor) throw Object.assign(new Error("El repartidor no existe"), { codigo: "NO_EXISTE" });
     const idEstadoActual = Number(repartidor.id_estado_repartidor);
 
-    const vigentes = await obtenerHorariosVigentesHoy(conmysql, idRepartidor);
+    const [horarios] = await conmysql.query(
+        `SELECT hr.id_reserva, hd.horario_fecha, hd.horario_hora_inicio, hd.horario_hora_fin
+         FROM horario_reservas hr
+         INNER JOIN horarios_disponibles hd ON hd.id_horario_disponible = hr.id_horario_disponible
+         WHERE hr.id_repartidor = ? AND hr.reserva_estado = 1 AND hd.horario_fecha = CURDATE()
+         ORDER BY hd.horario_hora_inicio ASC`,
+        [idRepartidor]
+    );
+
+    const ahora = new Date();
+    const vigentes = horarios.filter(h => calcularFinTurno(h) > ahora);
+
     if (!vigentes.length) {
         return { tieneHorario: false, enCurso: false, minutosParaInicio: null, puedeConectarse: false, id_estado_repartidor: idEstadoActual };
     }
 
-    const ahora = new Date();
     const horario = elegirHorarioRelevante(vigentes, ahora);
     const inicioTurno = calcularInicioTurno(horario);
     const finTurno = calcularFinTurno(horario);
     const minutosParaInicio = (inicioTurno.getTime() - ahora.getTime()) / 60000;
     const enCurso = inicioTurno <= ahora && finTurno > ahora;
+    // Solo tiene sentido "conectarse" si sigue DESCONECTADO. Si ya está LISTO/REPARTIENDO, el frontend oculta el widget.
     const puedeConectarse = idEstadoActual === ESTADO_REPARTIDOR.DESCONECTADO && (enCurso || minutosParaInicio <= MINUTOS_ANTICIPACION_MINIMA);
 
     return {
@@ -73,7 +58,8 @@ export async function obtenerEstadoConexion(idRepartidor) {
     };
 }
 
-// Ejecuta la conexión: valida todo de nuevo contra el servidor antes de escribir en BD.
+// ÚNICO punto donde un repartidor pasa de DESCONECTADO a LISTO/REPARTIENDO.
+// Se ejecuta EXCLUSIVAMENTE cuando el repartidor pulsa "Conectarse" (acción explícita, opcional).
 export async function conectarRepartidor(idRepartidor) {
     const conn = await conmysql.getConnection();
     try {
@@ -127,7 +113,8 @@ export async function conectarRepartidor(idRepartidor) {
     }
 }
 
-// Job periódico: pasa de LISTO a REPARTIENDO en cuanto empieza el turno reservado, sin que el repartidor haga nada.
+// Job periódico: SOLO avanza a quien ya eligió conectarse (LISTO) y su turno ya empezó.
+// Jamás conecta a alguien DESCONECTADO — respeta que conectarse es opcional.
 export async function activarTurnosIniciados() {
     const [resultado] = await conmysql.query(
         `UPDATE repartidores r
