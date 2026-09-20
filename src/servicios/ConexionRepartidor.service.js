@@ -1,4 +1,5 @@
 import { conmysql } from "../db.js";
+import { instanteUtcDesdeHoraEcuador } from "../utils/horarioTiempo.js";
 
 const ESTADO_REPARTIDOR = { LISTO: 1, REPARTIENDO: 2, EN_PEDIDO: 3, EN_PAUSA: 4, DESCONECTADO: 5, INHABILITADO: 6 };
 const MINUTOS_ANTICIPACION_MINIMA = 15;
@@ -15,8 +16,10 @@ function combinarFechaHora(horarioFecha, horaTexto) {
     return new Date(anio, mes - 1, dia, hora, minuto, segundo);
 }
 
-const calcularInicioTurno = h => combinarFechaHora(h.horario_fecha, h.horario_hora_inicio);
-const calcularFinTurno = h => combinarFechaHora(h.horario_fecha, h.horario_hora_fin);
+/* const calcularInicioTurno = h => combinarFechaHora(h.horario_fecha, h.horario_hora_inicio);
+const calcularFinTurno = h => combinarFechaHora(h.horario_fecha, h.horario_hora_fin); */
+const calcularInicioTurno = h => instanteUtcDesdeHoraEcuador(h.horario_fecha, h.horario_hora_inicio);
+const calcularFinTurno = h => instanteUtcDesdeHoraEcuador(h.horario_fecha, h.horario_hora_fin);
 
 async function obtenerHorariosVigentesHoy(conn, idRepartidor) {
     const [horarios] = await conn.query(
