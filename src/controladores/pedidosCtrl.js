@@ -1606,6 +1606,18 @@ export const confirmarPagoPedido = async (req, res) => {
         if (!esIdValido(id)) return res.status(400).json({ success: false, message: "ID no válido." });
         if (!tieneRol(req, ["SOPORTE", "ADMINISTRADOR"])) return res.status(403).json({ success: false, message: "No tienes permisos para confirmar pagos." });
         const [resultado] = await conmysql.query(`UPDATE pedidos SET pedido_pago_confirmado=1 WHERE id_pedido=?`, [id]);
+
+            if (pedidoActualizado?.cliente_id_usuario) {
+                await crearNotificacion({
+                    id_usuario_destino: pedidoActualizado.cliente_id_usuario,
+                    tipo: "PEDIDO",
+                    titulo: "Pago confirmado",
+                    mensaje: `Tu pago del pedido ${pedidoActualizado.pedido_codigo} fue confirmado. Tu pedido continúa en proceso.`,
+                    referencia_tipo: "PEDIDO",
+                    referencia_id: pedidoActualizado.id_pedido
+                });
+            }
+        
         if (!resultado.affectedRows) return res.status(404).json({ success: false, message: "Pedido no encontrado." });
         const pedidoActualizado = await obtenerPedidoPorIdInterno(id);
         return res.json({ success: true, message: "Pago confirmado correctamente.", ...ocultarPedidoPin(pedidoActualizado, req) });
@@ -1753,6 +1765,16 @@ export const cancelarPedido = async (req, res) => {
         }
 
         const pedidoActualizado = await obtenerPedidoPorIdInterno(id);
+        const destinatarios = [pedido.cliente_id_usuario, pedidoActualizado?.local_id_usuario, pedidoActualizado?.repartidor_id_usuario].filter(Boolean);
+        // Nota: cliente_id_usuario / local_id_usuario / repartidor_id_usuario deben venir en el SELECT de obtenerPedidoPorIdInterno;
+        // si no los tienes ahí, resuélvelos con una consulta rápida a usuarios vía obtenerLocalDelUsuario/obtenerClienteDelUsuario o un JOIN adicional.
+        await crearNotificacionesMasivas(destinatarios, {
+            tipo: "PEDIDO",
+            titulo: "Pedido cancelado",
+            mensaje: `El pedido ${pedido.pedido_codigo} fue cancelado${motivo ? `: ${motivo}` : "."}`,
+            referencia_tipo: "PEDIDO",
+            referencia_id: pedido.id_pedido
+        });
         emitirEventoPedido("pedido_cancelado", pedidoActualizado);
         void notificarNuevoPedidoAlLocal(pedidoActualizado, "pedido_cancelado").catch(error => console.error("[Pedidos] Error enviando push de pedido cancelado:", error));
         return res.json({ success: true, message: "Pedido cancelado correctamente.", ...ocultarPedidoPin(pedidoActualizado, req) });
