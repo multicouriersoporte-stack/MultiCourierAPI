@@ -2,7 +2,7 @@ import express from "express";
 import { listarDisponibles, listarMisReservasActivas, listarMisHoras, listarHistorial } from "../controladores/horariosCtrl.js";
 import { solicitarReserva, consultarSolicitud, soltarHoras } from "../controladores/reservasCtrl.js";
 import { ofrecer, listarOfertas, misIntercambios, solicitar, aceptar, rechazar, cancelar } from "../controladores/intercambiosCtrl.js";
-import { getEstadoConexionxd, postConectarxd } from "../controladores/estadoConexionCtrl.js";
+//import { getEstadoConexionxd, postConectarxd } from "../controladores/estadoConexionCtrl.js";
 import { getEstadoConexion, postConectar } from "../controladores/conexionCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
@@ -17,7 +17,7 @@ router.get("/horarios/mis-reservas-activas", verificarToken, SOLO_REPARTIDOR, li
 router.get("/horarios/mis-horas", verificarToken, SOLO_REPARTIDOR, listarMisHoras);
 router.get("/horarios/historial", verificarToken, SOLO_REPARTIDOR, listarHistorial);
 
-router.get("/repartidores/estado-conexion", verificarToken, SOLO_REPARTIDOR, getEstadoConexion);
+//router.get("/repartidores/estado-conexion", verificarToken, SOLO_REPARTIDOR, getEstadoConexion);
 router.post("/repartidores/conectar", verificarToken, SOLO_REPARTIDOR, postConectar);
 router.get("/horarios/estado-conexion", verificarToken, SOLO_REPARTIDOR, getEstadoConexion);
 
