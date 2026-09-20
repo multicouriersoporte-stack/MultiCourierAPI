@@ -714,6 +714,7 @@ import { asignarRepartidorAutomaticamente } from "./pedidorepartidoresCtrl.js";
 import { crearPagoLocalDesdePedido } from "./pagoslocalesCtrl.js";
 import { crearPagoRepartidorDesdePedido } from "./pagosrepartidorCtrl.js";
 import { obtenerAsignacionActiva } from "./pedidorepartidoresCtrl.js";
+import { crearNotificacion, crearNotificacionesMasivas } from "./notificacionesCtrl.js";
 
 const ROLES_ADMINISTRATIVOS = ["CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"];
 const ROLES_MODIFICAR_PEDIDOS = ["LOCAL", "REPARTIDOR", "CLIENTE", "SOPORTE", "ADMINISTRADOR"];
