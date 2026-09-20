@@ -8,6 +8,7 @@ export const conmysql=createPool({
     database: BD_DATABASE,
     user: DB_USER,
     password: DB_PASSWORD,
-    port: DB_PORT
+    //port: DB_PORT
+    port: Number(DB_PORT),
     timezone: '-05:00'
 })
