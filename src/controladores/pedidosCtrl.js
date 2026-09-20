@@ -902,7 +902,6 @@ import { crearPagoRepartidorDesdePedido } from "./pagosrepartidorCtrl.js";
 import { obtenerAsignacionActiva } from "./pedidorepartidoresCtrl.js";
 import { crearNotificacion, crearNotificacionesMasivas } from "./notificacionesCtrl.js";
 import { notificarNuevoPedidoAlLocal } from "./pushCtrl.js";
-import { crearNotificacion, crearNotificacionesMasivas } from "./notificacionesCtrl.js";
 
 const emitirEventoPedido = (evento, pedido) => {
   const io = global._io;
