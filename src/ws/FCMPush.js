@@ -2,6 +2,8 @@
 
 import admin from "firebase-admin";
 
+const CANAL_NOTIFICACIONES = "RiderMultiCourierPedidosV2";
+
 // Firebase Admin se inicializa una sola vez. FCM y Socket.IO funcionan de forma independiente.
 let firebaseInicializado = false;
 
@@ -179,9 +181,8 @@ const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => ({
     android: {
         priority: "high",
         notification: {
-            channelId: "multicourier_pedidos",
+            channelId: CANAL_NOTIFICACIONES,
             sound: sonido,
-            defaultSound: false,
             defaultVibrateTimings: true,
             priority: "max",
             visibility: "public",
