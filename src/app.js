@@ -50,6 +50,13 @@ import notificacionesRoutes from "./routes/notificaciones.routes.js";
 import "./servicios/Generarhorariossemanales.job.js";
 import { iniciarSchedulerEstadosRepartidor } from "./servicios/EstadoRepartidorScheduler.service.js";
 
+import { activarTurnosIniciados } from "./servicios/ConexionRepartidor.service.js";
+import { finalizarReservasVencidas } from "./servicios/Reservas.service.js";
+setInterval(() => {
+    activarTurnosIniciados().catch(err => console.error("Error activando turnos iniciados:", err));
+    finalizarReservasVencidas().catch(err => console.error("Error finalizando reservas vencidas:", err));
+}, 60 * 1000);
+
 config();
 
 const app = express();
