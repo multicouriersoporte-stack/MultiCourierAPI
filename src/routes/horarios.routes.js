@@ -4,8 +4,6 @@ import { solicitarReserva, consultarSolicitud, soltarHoras } from "../controlado
 import { ofrecer, listarOfertas, misIntercambios, solicitar, aceptar, rechazar, cancelar } from "../controladores/intercambiosCtrl.js";
 import { getEstadoConexion, postConectar } from "../controladores/estadoConexionCtrl.js";
 import { getEstadoConexion, postConectar } from "../controladores/conexionCtrl.js";
-router.get("/horarios/estado-conexion", verificarToken, SOLO_REPARTIDOR, getEstadoConexion);
-router.post("/repartidores/conectar", verificarToken, SOLO_REPARTIDOR, postConectar);
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
 
