@@ -52,20 +52,19 @@ export const enviarCodigoVerificacion = async (req, res) => {
         } */
 
         const [previo] = await conmysql.query(
-            `SELECT creado_en FROM email_verificaciones WHERE email = ? LIMIT 1`,
+            `SELECT
+                creado_en,
+                TIMESTAMPDIFF(SECOND, creado_en, NOW()) AS segundos_transcurridos
+             FROM email_verificaciones
+             WHERE email = ?
+             LIMIT 1`,
             [email]
         );
         
         if (previo.length) {
-            const creadoEn = new Date(previo[0].creado_en);
-            const ahora = Date.now();
+            const segundosTranscurridos = Number(previo[0].segundos_transcurridos);
         
-            const segundosTranscurridos = Math.floor(
-                (ahora - creadoEn.getTime()) / 1000
-            );
-        
-            console.log("creado_en:", creadoEn);
-            console.log("Ahora:", new Date(ahora));
+            console.log("creado_en:", previo[0].creado_en);
             console.log("Segundos transcurridos:", segundosTranscurridos);
         
             if (segundosTranscurridos < REENVIO_SEGUNDOS) {
@@ -77,6 +76,7 @@ export const enviarCodigoVerificacion = async (req, res) => {
                 });
             }
         }
+
 
 
         const codigo = generarCodigo();
