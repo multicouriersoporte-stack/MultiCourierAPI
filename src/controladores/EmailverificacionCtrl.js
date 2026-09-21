@@ -39,7 +39,7 @@ export const enviarCodigoVerificacion = async (req, res) => {
             return res.status(400).json({ message: "El dominio del correo no existe o no recibe correos" });
 
         // Evita reenvíos inmediatos (protege contra abuso / spam del propio remitente).
-        const [previo] = await conmysql.query(
+        /* const [previo] = await conmysql.query(
             `SELECT creado_en FROM email_verificaciones WHERE email = ? LIMIT 1`, [email]
         );
         if (previo.length) {
@@ -47,6 +47,33 @@ export const enviarCodigoVerificacion = async (req, res) => {
             if (segundos < REENVIO_SEGUNDOS) {
                 return res.status(429).json({
                     message: `Espera ${Math.ceil(REENVIO_SEGUNDOS - segundos)} segundos antes de reenviar el código`
+                });
+            }
+        } */
+
+        const [previo] = await conmysql.query(
+            `SELECT creado_en FROM email_verificaciones WHERE email = ? LIMIT 1`,
+            [email]
+        );
+        
+        if (previo.length) {
+            const creadoEn = new Date(previo[0].creado_en);
+            const ahora = Date.now();
+        
+            const segundosTranscurridos = Math.floor(
+                (ahora - creadoEn.getTime()) / 1000
+            );
+        
+            console.log("creado_en:", creadoEn);
+            console.log("Ahora:", new Date(ahora));
+            console.log("Segundos transcurridos:", segundosTranscurridos);
+        
+            if (segundosTranscurridos < REENVIO_SEGUNDOS) {
+                const restantes = REENVIO_SEGUNDOS - segundosTranscurridos;
+        
+                return res.status(429).json({
+                    message: `Espera ${restantes} segundos antes de reenviar el código`,
+                    segundosRestantes: restantes
                 });
             }
         }
