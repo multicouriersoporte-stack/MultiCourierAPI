@@ -1,6 +1,6 @@
 import dns from "dns/promises";
 import { conmysql } from "../db.js";
-import { enviarCorreoCodigo } from "./Mailer.js";
+import { enviarCorreoCodigo } from "../mailer.js";
 
 const VIGENCIA_MINUTOS = 10;
 const MAX_INTENTOS = 5;
@@ -9,6 +9,8 @@ const REENVIO_SEGUNDOS = 60;
 const generarCodigo = () => String(Math.floor(100000 + Math.random() * 900000));
 
 // Comprueba que el dominio del correo tenga registros MX (servidores de correo reales).
+// Esto filtra dominios inventados como "direccioninvalida.com" sin necesidad de un
+// servicio de terceros pago.
 async function dominioTieneServidorDeCorreo(email) {
     const dominio = email.split("@")[1];
     try {
@@ -36,29 +38,17 @@ export const enviarCodigoVerificacion = async (req, res) => {
         if (!dominioValido)
             return res.status(400).json({ message: "El dominio del correo no existe o no recibe correos" });
 
-        // Si ya está verificado (interruptor ya encendido), no reenvía nada.
-        const [yaVerificado] = await conmysql.query(
-            `SELECT verificado FROM email_verificaciones WHERE email = ? AND verificado = 1 LIMIT 1`, [email]
-        );
-        if (yaVerificado.length) return res.json({ success: true, message: "El correo ya estaba verificado", yaVerificado: true });
-
         // Evita reenvíos inmediatos (protege contra abuso / spam del propio remitente).
         const [previo] = await conmysql.query(
-            `SELECT
-                creado_en,
-                TIMESTAMPDIFF(SECOND, creado_en, NOW()) AS segundos_transcurridos
-             FROM email_verificaciones
-             WHERE email = ?
-             LIMIT 1`,
+            `SELECT TIMESTAMPDIFF(SECOND, creado_en, NOW()) AS segundos_transcurridos
+             FROM email_verificaciones WHERE email = ? LIMIT 1`,
             [email]
         );
 
         if (previo.length) {
             const segundosTranscurridos = Number(previo[0].segundos_transcurridos);
-
             if (segundosTranscurridos < REENVIO_SEGUNDOS) {
                 const restantes = REENVIO_SEGUNDOS - segundosTranscurridos;
-
                 return res.status(429).json({
                     message: `Espera ${restantes} segundos antes de reenviar el código`,
                     segundosRestantes: restantes
@@ -82,11 +72,18 @@ export const enviarCodigoVerificacion = async (req, res) => {
         return res.json({ success: true, message: "Código enviado correctamente" });
     } catch (error) {
         console.error("Error enviarCodigoVerificacion:", error);
-        return res.status(500).json({ message: "No se pudo enviar el código de verificación" });
+        // Si la causa fue configuración de correo incompleta, se refleja el motivo real
+        // en vez de un 500 genérico, para depurar más rápido en los logs de Render.
+        const detalle = error?.message?.includes("Configuración de correo incompleta")
+            ? error.message
+            : "No se pudo enviar el código de verificación";
+        return res.status(500).json({ message: detalle });
     }
 };
 
 // Valida el código de 6 dígitos ingresado por el usuario.
+// Una vez verificado, queda marcado como un "interruptor" (verificado = 1):
+// no vuelve a pedirse mientras no cambie el correo, y el registro puede continuar.
 export const verificarCodigoEmail = async (req, res) => {
     try {
         const email = req.body?.email?.trim().toLowerCase();
@@ -118,28 +115,11 @@ export const verificarCodigoEmail = async (req, res) => {
     }
 };
 
-// NUEVO: consulta si un correo ya quedó verificado (el "interruptor").
-// El frontend la llama al perder el foco el campo de correo, para no
-// pedir el código de nuevo si ya se verificó antes en la misma sesión/tabla.
-export const estadoVerificacionEmail = async (req, res) => {
-    try {
-        const email = (req.params?.email || req.body?.email)?.trim().toLowerCase();
-        if (!email) return res.status(400).json({ message: "El correo es obligatorio" });
-
-        const verificado = await correoFueVerificado(email);
-        return res.json({ verificado });
-    } catch (error) {
-        console.error("Error estadoVerificacionEmail:", error);
-        return res.status(500).json({ message: "No se pudo consultar el estado de verificación" });
-    }
-};
-
 // Uso interno desde registroCtrl.js: confirma que el correo fue verificado antes de crear la cuenta.
 export const correoFueVerificado = async (email) => {
     const [rows] = await conmysql.query(
         `SELECT verificado FROM email_verificaciones WHERE email = ? AND verificado = 1 LIMIT 1`,
         [email.trim().toLowerCase()]
     );
-
     return rows.length > 0;
 };
