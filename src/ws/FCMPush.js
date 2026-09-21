@@ -2,7 +2,7 @@
 
 import admin from "firebase-admin";
 
-const CANAL_NOTIFICACIONES = "RiderMultiCourierPedidosV2";
+const CANAL_NOTIFICACIONES = "RiderMultiCourierPedidosV3";
 
 // Firebase Admin se inicializa una sola vez. FCM y Socket.IO funcionan de forma independiente.
 let firebaseInicializado = false;
