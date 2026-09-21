@@ -1,41 +1,40 @@
-// IMPORTANTE: esta línea debe ejecutarse antes de leer cualquier process.env.*
-// Si tu archivo de entrada (index.js / server.js) ya llama a dotenv.config()
-// ANTES de importar cualquier ruta/controlador, esta línea es redundante pero
-// inofensiva (dotenv no sobreescribe variables ya cargadas). Si el orden estaba
-// mal, esta línea es la que soluciona tu ECONNREFUSED 127.0.0.1:587.
-import "dotenv/config";
 import nodemailer from "nodemailer";
 
-const { MAIL_HOST, MAIL_PORT, MAIL_USER, MAIL_PASS } = process.env;
+// El transporter se crea la PRIMERA VEZ que se necesita enviar un correo,
+// no al importar este archivo. Esto evita el bug de ECONNREFUSED 127.0.0.1:587:
+// si mailer.js se importa (indirectamente, vía las rutas) antes de que
+// dotenv.config() haya cargado el .env, process.env.MAIL_HOST llega undefined
+// y nodemailer se conecta a localhost por defecto.
+let transporterInstance = null;
 
-// Falla rápido y con mensaje claro en vez de conectarse silenciosamente a
-// localhost:587 (que es justo lo que te está pasando ahora).
-if (!MAIL_HOST || !MAIL_USER || !MAIL_PASS) {
-    console.error(
-        "[mailer] Faltan variables de entorno de correo. " +
-        `MAIL_HOST=${MAIL_HOST ?? "(vacío)"} MAIL_USER=${MAIL_USER ? "OK" : "(vacío)"} MAIL_PASS=${MAIL_PASS ? "OK" : "(vacío)"}. ` +
-        "Revisa tu .env local y las variables de entorno en Render (y redeploy tras agregarlas)."
-    );
+function crearTransporter() {
+    const { MAIL_HOST, MAIL_PORT, MAIL_USER, MAIL_PASS } = process.env;
+
+    if (!MAIL_HOST || !MAIL_USER || !MAIL_PASS) {
+        throw new Error(
+            "Configuración de correo incompleta: revisa MAIL_HOST, MAIL_USER y MAIL_PASS " +
+            "en las variables de entorno (.env local y variables de Render)."
+        );
+    }
+
+    return nodemailer.createTransport({
+        host: MAIL_HOST,
+        port: Number(MAIL_PORT || 587),
+        secure: Number(MAIL_PORT) === 465,
+        auth: { user: MAIL_USER, pass: MAIL_PASS }
+    });
 }
 
-export const transporter = nodemailer.createTransport({
-    host: MAIL_HOST,
-    port: Number(MAIL_PORT || 587),
-    secure: Number(MAIL_PORT) === 465,
-    auth: {
-        user: MAIL_USER,
-        pass: MAIL_PASS
-    }
-});
+function obtenerTransporter() {
+    if (!transporterInstance) transporterInstance = crearTransporter();
+    return transporterInstance;
+}
 
 // Envía el correo con el código de verificación de 6 dígitos.
 export const enviarCorreoCodigo = async (destino, codigo) => {
-    if (!MAIL_HOST || !MAIL_USER || !MAIL_PASS) {
-        throw new Error("El servicio de correo no está configurado (faltan variables MAIL_HOST/MAIL_USER/MAIL_PASS)");
-    }
-
+    const transporter = obtenerTransporter();
     await transporter.sendMail({
-        from: `"MultiCourier" <${MAIL_USER}>`,
+        from: `"MultiCourier" <${process.env.MAIL_USER}>`,
         to: destino,
         subject: "Tu código de verificación - MultiCourier",
         html: `
