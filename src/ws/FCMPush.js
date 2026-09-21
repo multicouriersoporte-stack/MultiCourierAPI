@@ -183,6 +183,7 @@ const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => ({
         notification: {
             channelId: CANAL_NOTIFICACIONES,
             sound: sonido,
+            icon: "ic_launcher",
             defaultVibrateTimings: true,
             priority: "max",
             visibility: "public",
