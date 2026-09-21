@@ -27,7 +27,7 @@ router.patch("/usuarios/:id", patchUsuarios);
 // Eliminar
 router.delete("/usuarios/:id", deleteUsuarios);
 
-export default router;
+export default router; :D
  */
 
 import { Router } from "express";
