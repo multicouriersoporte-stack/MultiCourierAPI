@@ -78,6 +78,7 @@ export const enviarCodigoVerificacion = async (req, res) => {
             }
         }
 
+
         const codigo = generarCodigo();
         const expiraEn = new Date(Date.now() + VIGENCIA_MINUTOS * 60000);
 
@@ -136,6 +137,7 @@ export const correoFueVerificado = async (email) => {
         `SELECT verificado FROM email_verificaciones WHERE email = ? AND verificado = 1 LIMIT 1`,
         [email.trim().toLowerCase()]
     );
+
     return rows.length > 0;
 };
 
