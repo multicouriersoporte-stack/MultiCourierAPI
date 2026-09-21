@@ -155,7 +155,7 @@ export const registrarCliente = async (req, res) => {
 
 import bcrypt from "bcrypt";
 import { conmysql } from "../db.js";
-import { correoFueVerificado } from "./EmailverificacionCtrl.js"
+import { correoFueVerificado } from "./emailVerificacionCtrl.js";
 
 // Rol asignado automáticamente al autorregistrarse como cliente.
 const ID_ROL_CLIENTE = 1;
@@ -255,7 +255,7 @@ export const registrarCliente = async (req, res) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email))
         return res.status(400).json({ message: "El correo electrónico no es válido" });
 
-    // Exige que el correo haya sido verificado por código previamente.
+    // Exige que el correo haya sido verificado por código previamente (el "interruptor").
     const verificado = await correoFueVerificado(email);
     if (!verificado)
         return res.status(400).json({ message: "Debes verificar tu correo electrónico antes de crear la cuenta" });
