@@ -61,7 +61,7 @@ import { permitirRoles } from "../middlewares/roles.middleware.js";
 
 const router = express.Router();
 
-// Consultas fijas PRIMERO
+// Consultas fijas ANTES de /:id
 router.get("/repartidores", verificarToken, permitirRoles("CLIENTE", "LOCAL", "REPARTIDOR", "CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"), getRepartidores);
 router.get("/repartidores/mio", verificarToken, permitirRoles("REPARTIDOR"), getMiRepartidor);
 
