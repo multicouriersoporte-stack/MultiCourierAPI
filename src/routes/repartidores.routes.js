@@ -55,6 +55,7 @@ import {
   patchRepartidores,
   deleteRepartidores
 } from "../controladores/repartidoresCtrl.js";
+import { getRepartidoresDisponiblesAsignacion } from "../controladores/pedidorepartidoresCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
 
@@ -63,6 +64,7 @@ const router = express.Router();
 // Consultas
 router.get("/repartidores", verificarToken, permitirRoles("CLIENTE", "LOCAL", "REPARTIDOR", "CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"), getRepartidores);
 router.get("/repartidores/mio", verificarToken, permitirRoles("REPARTIDOR"), getMiRepartidor);
+//router.get("/repartidores/disponibles-asignacion", verificarToken, getRepartidoresDisponiblesAsignacion);
 router.get("/repartidores/usuario/:id_usuario", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"), getRepartidorPorUsuario);
 router.get("/repartidores/codigo/:codigo", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"), getRepartidorPorCodigo);
 router.get("/repartidores/:id", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"), getRepartidorxid);
