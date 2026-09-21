@@ -37,7 +37,7 @@ import {
     patchUsuarios, deleteUsuarios
 } from "../controladores/usuariosCtrl.js";
 import { registrarCliente } from "../controladores/registroCtrl.js";
-import { enviarCodigoVerificacion, verificarCodigoEmail } from "../controladores/emailVerificacionCtrl.js";
+import { enviarCodigoVerificacion, verificarCodigoEmail } from "../controladores/EmailverificacionCtrl.js";
 
 const router = Router();
 
