@@ -1,6 +1,6 @@
 import dns from "dns/promises";
 import { conmysql } from "../db.js";
-import { enviarCorreoCodigo } from "../mailer.js";
+import { enviarCorreoCodigo } from "../Mailer.js";
 
 const VIGENCIA_MINUTOS = 10;
 const MAX_INTENTOS = 5;
