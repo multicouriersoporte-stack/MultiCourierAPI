@@ -32,13 +32,25 @@ export const registrarToken = async (req, res) => {
         const idUsuarioSesion = obtenerIdUsuario(req);
         const token = String(req.body?.token_fcm || "").trim();
         const idUsuario = normalizarId(req.body?.id_usuario) || idUsuarioSesion;
-        const idLocal = normalizarId(req.body?.id_local);
+        let idLocal = normalizarId(req.body?.id_local);
         const plataforma = String(req.body?.plataforma || "android").trim().slice(0, 30) || "android";
 
         if (!idUsuarioSesion || !idUsuario || idUsuario !== idUsuarioSesion) {
             return res.status(403).json({ success: false, message: "El token no pertenece al usuario autenticado." });
         }
         if (!token) return res.status(400).json({ success: false, message: "token_fcm es obligatorio." });
+
+        if (!idLocal) {
+            const [locales] = await conmysql.query(
+                `SELECT id_local FROM locales WHERE id_usuario=? LIMIT 1`,
+                [idUsuario]
+            );
+            idLocal = locales[0]?.id_local ? Number(locales[0].id_local) : null;
+        }
+
+        if (!idLocal) {
+            return res.status(400).json({ success: false, message: "No se encontró un local asociado al usuario." });
+        }
 
         await asegurarTablaTokens();
         await conmysql.query(`
@@ -77,8 +89,11 @@ export const enviarPushAlLocal = async (idLocal, { tipo, titulo, mensaje, pedido
     try {
         await asegurarTablaTokens();
         const [filas] = await conmysql.query(
-            `SELECT token_fcm FROM push_tokens WHERE id_local=? AND activo=1`,
-            [local]
+            `SELECT DISTINCT pt.token_fcm
+             FROM push_tokens pt
+             LEFT JOIN locales l ON l.id_usuario=pt.id_usuario
+             WHERE pt.activo=1 AND (pt.id_local=? OR l.id_local=?)`,
+            [local, local]
         );
         const tokens = filas.map(fila => fila.token_fcm).filter(Boolean);
         if (!tokens.length) return { success: false, enviados: 0, error: "SIN_TOKENS" };
