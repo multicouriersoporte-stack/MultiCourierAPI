@@ -1,42 +1,41 @@
+// IMPORTANTE: esta línea debe ejecutarse antes de leer cualquier process.env.*
+// Si tu archivo de entrada (index.js / server.js) ya llama a dotenv.config()
+// ANTES de importar cualquier ruta/controlador, esta línea es redundante pero
+// inofensiva (dotenv no sobreescribe variables ya cargadas). Si el orden estaba
+// mal, esta línea es la que soluciona tu ECONNREFUSED 127.0.0.1:587.
+import "dotenv/config";
 import nodemailer from "nodemailer";
 
-// Variables de entorno requeridas (configúralas en Render → Environment):
-//   MAIL_HOST  -> ej. smtp.gmail.com  o el host SMTP de tu proveedor (Resend, SendGrid, etc.)
-//   MAIL_PORT  -> 587 (STARTTLS) o 465 (SSL)
-//   MAIL_USER  -> usuario/cuenta remitente
-//   MAIL_PASS  -> contraseña de aplicación (NUNCA la contraseña normal de la cuenta)
-//
-// Si usas Gmail: activa verificación en 2 pasos y genera una "contraseña de aplicación"
-// en https://myaccount.google.com/apppasswords — Gmail bloquea el login con la clave normal.
+const { MAIL_HOST, MAIL_PORT, MAIL_USER, MAIL_PASS } = process.env;
 
-const configCompleta = !!(process.env.MAIL_HOST && process.env.MAIL_USER && process.env.MAIL_PASS);
-
-if (!configCompleta) {
+// Falla rápido y con mensaje claro en vez de conectarse silenciosamente a
+// localhost:587 (que es justo lo que te está pasando ahora).
+if (!MAIL_HOST || !MAIL_USER || !MAIL_PASS) {
     console.error(
-        "[Mailer] Faltan variables de entorno MAIL_HOST / MAIL_USER / MAIL_PASS. " +
-        "El envío de correos fallará hasta que se configuren en el servidor."
+        "[mailer] Faltan variables de entorno de correo. " +
+        `MAIL_HOST=${MAIL_HOST ?? "(vacío)"} MAIL_USER=${MAIL_USER ? "OK" : "(vacío)"} MAIL_PASS=${MAIL_PASS ? "OK" : "(vacío)"}. ` +
+        "Revisa tu .env local y las variables de entorno en Render (y redeploy tras agregarlas)."
     );
 }
 
 export const transporter = nodemailer.createTransport({
-    host: process.env.MAIL_HOST,
-    port: Number(process.env.MAIL_PORT || 587),
-    secure: process.env.MAIL_PORT === "465",
+    host: MAIL_HOST,
+    port: Number(MAIL_PORT || 587),
+    secure: Number(MAIL_PORT) === 465,
     auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS
+        user: MAIL_USER,
+        pass: MAIL_PASS
     }
 });
 
 // Envía el correo con el código de verificación de 6 dígitos.
 export const enviarCorreoCodigo = async (destino, codigo) => {
-    if (!configCompleta) {
-        // Error controlado y explícito en vez de un ECONNREFUSED confuso.
-        throw new Error("El servidor de correo no está configurado (faltan variables de entorno MAIL_HOST/MAIL_USER/MAIL_PASS)");
+    if (!MAIL_HOST || !MAIL_USER || !MAIL_PASS) {
+        throw new Error("El servicio de correo no está configurado (faltan variables MAIL_HOST/MAIL_USER/MAIL_PASS)");
     }
 
     await transporter.sendMail({
-        from: `"MultiCourier" <${process.env.MAIL_USER}>`,
+        from: `"MultiCourier" <${MAIL_USER}>`,
         to: destino,
         subject: "Tu código de verificación - MultiCourier",
         html: `
