@@ -14,6 +14,13 @@ const ESTADO_REPARTIDOR_EN_PEDIDO = "EN_PEDIDO";
 const ESTADO_REPARTIDOR_REPARTIENDO = "REPARTIENDO";
 const ESTADO_REPARTIDOR_DESCONECTADO = "DESCONECTADO";
 
+const ESTADOS_PEDIDO_NO_ASIGNABLES = ["ENTREGADO", "NO_ENTREGADO", "CANCELADO"];
+
+const pedidoPermiteAsignacion = (estadoNombre) => {
+  const estado = String(estadoNombre || "").trim().toUpperCase();
+  return !ESTADOS_PEDIDO_NO_ASIGNABLES.includes(estado);
+};
+
 // Autorización
 const obtenerIdUsuario = req => {
     const u = req.usuario || {};
@@ -139,12 +146,19 @@ const crearAsignacion = async ({ conexion, pedido, repartidor, idEstadoOfertado 
 };
 
 // Asocia el repartidor al pedido sin modificar el estado del pedido.
-const asociarRepartidorAlPedido = async (conexion, id_pedido, id_repartidor, idEstadoEnPreparacion) => {
+/* const asociarRepartidorAlPedido = async (conexion, id_pedido, id_repartidor, idEstadoEnPreparacion) => {
     const [resultado] = await conexion.query(
         `UPDATE pedidos SET id_repartidor=? WHERE id_pedido=? AND id_repartidor IS NULL AND id_estado=?`,
         [id_repartidor, id_pedido, idEstadoEnPreparacion]
     );
     return resultado;
+}; */
+const asociarRepartidorAlPedido = async (conexion, id_pedido, id_repartidor) => {
+  const [resultado] = await conexion.query(
+    `UPDATE pedidos SET id_repartidor=? WHERE id_pedido=? AND id_repartidor IS NULL`,
+    [id_repartidor, id_pedido]
+  );
+  return resultado;
 };
 
 // Marca al repartidor como EN_PEDIDO desde el momento de la asignación.
@@ -367,8 +381,7 @@ export const asignarRepartidorAutomaticamente = async id_pedido => {
         const actualizacion = await asociarRepartidorAlPedido(
             conexion,
             id_pedido,
-            repartidor.id_repartidor,
-            idEstadoEnPreparacion
+            repartidor.id_repartidor
         );
 
         if (!actualizacion.affectedRows) {
@@ -654,10 +667,7 @@ export const asignarRepartidorManualmente = async (req, res) => {
 
         await conexion.beginTransaction();
 
-        const idEstadoEnPreparacion = await obtenerIdEstadoPedido(conexion, ESTADO_PEDIDO_EN_PREPARACION);
         const idEstadoOfertado = await obtenerIdEstadoPedidoRepartidor(conexion, ESTADO_PR_OFERTADO);
-
-        if (!idEstadoEnPreparacion) throw new Error(`No existe el estado PEDIDO "${ESTADO_PEDIDO_EN_PREPARACION}".`);
         if (!idEstadoOfertado) throw new Error(`No existe el estado PEDIDO_REPARTIDOR "${ESTADO_PR_OFERTADO}".`);
 
         const pedido = await obtenerPedidoBloqueado(conexion, id_pedido);
@@ -667,13 +677,12 @@ export const asignarRepartidorManualmente = async (req, res) => {
             return res.status(404).json({ success: false, message: "El pedido no existe." });
         }
 
-        if (Number(pedido.id_estado) !== Number(idEstadoEnPreparacion)) {
+        if (!pedidoPermiteAsignacion(pedido.estado_nombre)) {
             await conexion.rollback();
             return res.status(409).json({
                 success: false,
-                message: `El pedido debe estar en ${ESTADO_PEDIDO_EN_PREPARACION}.`,
-                estado_actual: pedido.estado_nombre,
-                id_estado_actual: pedido.id_estado
+                message: `No se puede asignar un pedido en estado ${pedido.estado_nombre}.`,
+                estado_actual: pedido.estado_nombre
             });
         }
 
@@ -681,7 +690,7 @@ export const asignarRepartidorManualmente = async (req, res) => {
             await conexion.rollback();
             return res.status(409).json({
                 success: false,
-                message: "El pedido ya tiene un repartidor. Para cambiarlo debes utilizar la reasignación."
+                message: "El pedido ya tiene un repartidor. Para cambiarlo usa la reasignación."
             });
         }
 
@@ -719,12 +728,7 @@ export const asignarRepartidorManualmente = async (req, res) => {
             idEstadoOfertado
         });
 
-        const actualizacion = await asociarRepartidorAlPedido(
-            conexion,
-            id_pedido,
-            id_repartidor,
-            idEstadoEnPreparacion
-        );
+        const actualizacion = await asociarRepartidorAlPedido(conexion, id_pedido, id_repartidor);
 
         if (!actualizacion.affectedRows) {
             await conexion.query(
@@ -752,7 +756,7 @@ export const asignarRepartidorManualmente = async (req, res) => {
             id_repartidor,
             repartidor_codigo: repartidor.repartidor_codigo,
             id_pedido_repartidor: idPedidoRepartidor,
-            estado_pedido: ESTADO_PEDIDO_EN_PREPARACION,
+            estado_pedido: pedido.estado_nombre,
             estado_asignacion: ESTADO_PR_OFERTADO,
             estado_repartidor: ESTADO_REPARTIDOR_EN_PEDIDO
         });
@@ -793,18 +797,19 @@ export const asignarRepartidorForzado = async (req, res) => {
 
         await conexion.beginTransaction();
 
-        const idEstadoEnPreparacion = await obtenerIdEstadoPedido(conexion, ESTADO_PEDIDO_EN_PREPARACION);
         const idEstadoOfertado = await obtenerIdEstadoPedidoRepartidor(conexion, ESTADO_PR_OFERTADO);
-
-        if (!idEstadoEnPreparacion) throw new Error(`No existe el estado PEDIDO "${ESTADO_PEDIDO_EN_PREPARACION}".`);
         if (!idEstadoOfertado) throw new Error(`No existe el estado PEDIDO_REPARTIDOR "${ESTADO_PR_OFERTADO}".`);
 
         const pedido = await obtenerPedidoBloqueado(conexion, id_pedido);
         if (!pedido) { await conexion.rollback(); return res.status(404).json({ success: false, message: "El pedido no existe." }); }
 
-        if (Number(pedido.id_estado) !== Number(idEstadoEnPreparacion)) {
+        if (!pedidoPermiteAsignacion(pedido.estado_nombre)) {
             await conexion.rollback();
-            return res.status(409).json({ success: false, message: `El pedido debe estar en ${ESTADO_PEDIDO_EN_PREPARACION}.`, estado_actual: pedido.estado_nombre });
+            return res.status(409).json({
+                success: false,
+                message: `No se puede asignar un pedido en estado ${pedido.estado_nombre}.`,
+                estado_actual: pedido.estado_nombre
+            });
         }
 
         if (pedido.id_repartidor !== null) {
@@ -818,7 +823,7 @@ export const asignarRepartidorForzado = async (req, res) => {
             return res.status(409).json({ success: false, message: "El pedido ya tiene una asignación activa.", asignacion: asignacionActiva });
         }
 
-        // Sin bloqueo por FOR UPDATE contra estados_repartidor: se acepta cualquier estado.
+        // Sin validar estado del repartidor: se acepta cualquier estado.
         const [repartidores] = await conexion.query(
             `SELECT r.id_repartidor,r.repartidor_codigo,er.estado_repartidor_nombre FROM repartidores r
              INNER JOIN estados_repartidor er ON r.id_estado_repartidor=er.id_estado_repartidor
@@ -830,7 +835,7 @@ export const asignarRepartidorForzado = async (req, res) => {
         const repartidor = repartidores[0];
 
         const idPedidoRepartidor = await crearAsignacion({ conexion, pedido, repartidor, idEstadoOfertado });
-        const actualizacion = await asociarRepartidorAlPedido(conexion, id_pedido, id_repartidor, idEstadoEnPreparacion);
+        const actualizacion = await asociarRepartidorAlPedido(conexion, id_pedido, id_repartidor);
 
         if (!actualizacion.affectedRows) {
             await conexion.query(`DELETE FROM pedido_repartidores WHERE id_pedido_repartidor=?`, [idPedidoRepartidor]);
@@ -885,9 +890,13 @@ export const reasignarRepartidorForzado = async (req, res) => {
         if (!pedido) { await conexion.rollback(); return res.status(404).json({ success: false, message: "El pedido no existe." }); }
 
         const estadoPedido = String(pedido.estado_nombre || "").trim().toUpperCase();
-        if (estadoPedido !== ESTADO_PEDIDO_EN_PREPARACION) {
+        if (!pedidoPermiteAsignacion(estadoPedido)) {
             await conexion.rollback();
-            return res.status(409).json({ success: false, message: `La reasignación forzada solo está disponible mientras el pedido está en ${ESTADO_PEDIDO_EN_PREPARACION}.`, estado_actual: pedido.estado_nombre });
+            return res.status(409).json({
+                success: false,
+                message: `No se puede reasignar un pedido en estado ${pedido.estado_nombre}.`,
+                estado_actual: pedido.estado_nombre
+            });
         }
 
         const idRepartidorAnterior = pedido.id_repartidor;
@@ -967,24 +976,13 @@ export const reasignarRepartidor = async (req, res) => {
             return res.status(404).json({ success: false, message: "El pedido no existe." });
         }
 
-/*         const estadosNoReasignables = ["ENTREGADO", "NO_ENTREGADO"];
         const estadoPedido = String(pedido.estado_nombre || "").trim().toUpperCase();
 
-        if (estadosNoReasignables.includes(estadoPedido)) {
+        if (!pedidoPermiteAsignacion(estadoPedido)) {
             await conexion.rollback();
             return res.status(409).json({
                 success: false,
-                message: "No se puede reasignar un pedido finalizado.",
-                estado_actual: pedido.estado_nombre
-            });
-        } */
-        const estadoPedido = String(pedido.estado_nombre || "").trim().toUpperCase();
-
-        if (estadoPedido !== ESTADO_PEDIDO_EN_PREPARACION) {
-            await conexion.rollback();
-            return res.status(409).json({
-                success: false,
-                message: `La reasignación solo está disponible mientras el pedido está en ${ESTADO_PEDIDO_EN_PREPARACION}.`,
+                message: `No se puede reasignar un pedido en estado ${pedido.estado_nombre}.`,
                 estado_actual: pedido.estado_nombre
             });
         }
