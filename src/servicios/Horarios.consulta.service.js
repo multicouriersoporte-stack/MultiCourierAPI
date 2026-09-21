@@ -90,12 +90,26 @@ export async function obtenerDisponiblesPorFecha(fecha) {
 }
 
 // Obtiene las horas del repartidor para una fecha, incluyendo estados 1 y 5.
-export async function obtenerMisHorasPorFecha(idRepartidor, fecha) {
+/* export async function obtenerMisHorasPorFecha(idRepartidor, fecha) {
     const [rows] = await conmysql.query(
         `SELECT hr.id_reserva, hr.reserva_estado, hd.* FROM horario_reservas hr
          JOIN horarios_disponibles hd ON hd.id_horario_disponible = hr.id_horario_disponible
          WHERE hr.id_repartidor = ? AND hd.horario_fecha = ? AND hr.reserva_estado IN (1, 5)
          AND TIMESTAMP(hd.horario_fecha, hd.horario_hora_fin) > NOW()
+         ORDER BY hd.horario_hora_inicio`,
+        [idRepartidor, fecha]
+    );
+    return rows;
+} */
+export async function obtenerMisHorasPorFecha(idRepartidor, fecha) {
+    const [rows] = await conmysql.query(
+        `SELECT hr.id_reserva, hr.reserva_estado, hd.*
+         FROM horario_reservas hr
+         JOIN horarios_disponibles hd ON hd.id_horario_disponible = hr.id_horario_disponible
+         WHERE hr.id_repartidor = ?
+           AND hd.horario_fecha = ?
+           AND hr.reserva_estado IN (1, 5)          -- estados que siguen siendo "tuyos"
+           AND CONCAT(hd.horario_fecha, ' ', hd.horario_hora_fin) > NOW()
          ORDER BY hd.horario_hora_inicio`,
         [idRepartidor, fecha]
     );
