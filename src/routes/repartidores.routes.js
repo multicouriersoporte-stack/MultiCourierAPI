@@ -66,11 +66,7 @@ router.get("/repartidores", verificarToken, permitirRoles("CLIENTE", "LOCAL", "R
 router.get("/repartidores/mio", verificarToken, permitirRoles("REPARTIDOR"), getMiRepartidor);
 
 // ✅ Ruta específica ANTES de /:id
-router.get(
-  "/repartidores/disponibles-asignacion",
-  verificarToken,
-  getRepartidoresDisponiblesAsignacion
-);
+router.get("/repartidores/disponibles-asignacion", verificarToken, getRepartidoresDisponiblesAsignacion);
 
 router.get("/repartidores/usuario/:id_usuario", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"), getRepartidorPorUsuario);
 router.get("/repartidores/codigo/:codigo", verificarToken, permitirRoles("CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"), getRepartidorPorCodigo);
