@@ -37,9 +37,6 @@ import {
     patchUsuarios, deleteUsuarios
 } from "../controladores/usuariosCtrl.js";
 import { registrarCliente } from "../controladores/registroCtrl.js";
-import {
-    enviarCodigoVerificacion, verificarCodigoEmail, consultarEstadoVerificacion
-} from "../controladores/EmailverificacionCtrl.js";
 
 const router = Router();
 
@@ -50,14 +47,11 @@ router.get("/usuarios/email/:email", getUsuarioPorEmail);
 router.get("/usuarios/codigo/:codigo", getUsuarioPorCodigo);
 router.get("/usuarios/:id_usuario/repartidor", getRepartidorPorUsuario);
 
-// Verificacion de correo (previa al registro publico).
-router.post("/usuarios/enviar-codigo", enviarCodigoVerificacion);
-router.post("/usuarios/verificar-codigo", verificarCodigoEmail);
-router.get("/usuarios/estado-verificacion/:email", consultarEstadoVerificacion);
-
 router.get("/usuarios/:id", getUsuarioxid); // Despues de las rutas especificas.
 
 // Registro publico de cliente (crea usuario + cliente + rol en una transaccion).
+// La verificación de correo ahora se hace con Firebase Authentication directo desde el
+// frontend (sendEmailVerification); registrarCliente solo comprueba emailVerified en Firebase.
 router.post("/usuarios/registro-cliente", registrarCliente);
 
 // Crear y modificar (uso administrativo).
