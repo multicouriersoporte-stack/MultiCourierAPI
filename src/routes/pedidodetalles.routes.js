@@ -10,6 +10,8 @@ import { permitirRoles } from "../middlewares/roles.middleware.js";
 
 const router = Router();
 
+const ROLES_GET = ["CLIENTE", "LOCAL", "REPARTIDOR", "CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"];
+
 // Rutas de consulta
 router.get("/pedidos-detalles", getPedidosDetalles);
 router.get("/pedidos-detalles/:id", getPedidoDetallePorId);
