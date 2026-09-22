@@ -63,7 +63,4 @@ router.patch("/usuarios/:id", patchUsuarios);
 router.delete("/usuarios/:id", deleteUsuarios);
 
 export default router;
-// Eliminar
-router.delete("/usuarios/:id", deleteUsuarios);
 
-export default router;
