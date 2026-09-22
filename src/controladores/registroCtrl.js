@@ -153,10 +153,9 @@ export const registrarCliente = async (req, res) => {
 };
  */
 
+import dns from "dns/promises";
 import bcrypt from "bcrypt";
 import { conmysql } from "../db.js";
-//import admin from "../config/firebaseAdmin.js"; // ajusta la ruta a donde guardes firebaseAdmin.js
-import { getAuth } from "../config/firebaseAdmin.js";
 
 // Rol asignado automáticamente al autorregistrarse como cliente.
 const ID_ROL_CLIENTE = 1;
@@ -172,6 +171,18 @@ const camposUsuario = `
     usuario_longitud, usuario_referencia, usuario_billetera, id_estado,
     usuario_fecha_registro, usuario_fecha_actualizacion
 `;
+
+// Comprueba que el dominio del correo tenga registros MX (servidores de correo reales),
+// para descartar dominios inventados o inexistentes sin tener que enviar nada.
+async function dominioTieneServidorDeCorreo(email) {
+    const dominio = email.split("@")[1];
+    try {
+        const registros = await dns.resolveMx(dominio);
+        return Array.isArray(registros) && registros.length > 0;
+    } catch {
+        return false;
+    }
+}
 
 // Genera el siguiente código disponible con formato PREFIJO+AA+BB+XXXX.
 // Debe llamarse dentro de una transacción abierta (conn), para que el
@@ -256,16 +267,11 @@ export const registrarCliente = async (req, res) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email))
         return res.status(400).json({ message: "El correo electrónico no es válido" });
 
-    // Exige que el correo haya sido verificado en Firebase (link de verificación enviado
-    // desde el frontend con sendEmailVerification). Reemplaza al viejo "interruptor" en MySQL.
-    let usuarioFirebase;
-    try {
-        usuarioFirebase = await admin.auth().getUserByEmail(email);
-    } catch {
-        return res.status(400).json({ message: "Debes verificar tu correo electrónico antes de crear la cuenta" });
-    }
-    if (!usuarioFirebase.emailVerified)
-        return res.status(400).json({ message: "Debes verificar tu correo electrónico antes de crear la cuenta" });
+    // Verificación "de que el correo es válido": el dominio debe tener servidores de correo
+    // reales (MX). No se envía nada ni se pide confirmación; es solo una comprobación técnica.
+    const dominioValido = await dominioTieneServidorDeCorreo(email);
+    if (!dominioValido)
+        return res.status(400).json({ message: "El dominio del correo no existe o no recibe correos" });
 
     // Verificación de email fuera de la transacción, para responder rápido en el caso común.
     const [existente] = await conmysql.query(`SELECT id_usuario FROM usuarios WHERE usuario_email = ? LIMIT 1`, [email]);
@@ -312,10 +318,6 @@ export const registrarCliente = async (req, res) => {
             );
 
             await conn.commit();
-
-            // Borra el usuario temporal de Firebase; solo se usó para confirmar el correo,
-            // no es el sistema de autenticación de MultiCourier (eso sigue siendo tu JWT propio).
-            admin.auth().deleteUser(usuarioFirebase.uid).catch(() => {});
 
             const [rows] = await conmysql.query(`SELECT ${camposUsuario} FROM usuarios WHERE id_usuario = ?`, [idUsuario]);
             return res.status(201).json({ success: true, message: "Cuenta creada con éxito", usuario: rows[0] });
