@@ -900,8 +900,10 @@ import { asignarRepartidorAutomaticamente } from "./pedidorepartidoresCtrl.js";
 import { crearPagoLocalDesdePedido } from "./pagoslocalesCtrl.js";
 import { crearPagoRepartidorDesdePedido } from "./pagosrepartidorCtrl.js";
 import { obtenerAsignacionActiva } from "./pedidorepartidoresCtrl.js";
+//import { crearNotificacion, crearNotificacionesMasivas } from "./notificacionesCtrl.js";
+//import { notificarNuevoPedidoAlLocal } from "./pushCtrl.js";
 import { crearNotificacion, crearNotificacionesMasivas } from "./notificacionesCtrl.js";
-import { notificarNuevoPedidoAlLocal } from "./pushCtrl.js";
+import { notificationService } from "../notifications/notification.service.js";
 
 const emitirEventoPedido = (evento, pedido) => {
   const io = global._io;
@@ -1126,7 +1128,7 @@ const verificarAccesoCliente = async (req, res, id_cliente) => {
 const obtenerPedidoPorIdInterno = async id_pedido => {
     const [pedidos] = await conmysql.query(`
         SELECT p.*,c.cliente_codigo,c.id_usuario AS cliente_id_usuario,u.usuario_cedula AS cliente_cedula,u.usuario_nombre AS cliente_nombre,u.usuario_apellido AS cliente_apellido,u.usuario_nombre_completo AS cliente_nombre_completo,u.usuario_email AS cliente_email,u.usuario_telefono AS cliente_telefono,
-        l.local_codigo,l.local_nombre_comercial,l.local_razon_social,l.local_telefono,l.local_email,e.estado_nombre,mp.metodo_pago_nombre,mp.metodo_pago_descripcion,
+        l.local_codigo,l.id_usuario AS local_id_usuario,l.local_nombre_comercial,l.local_razon_social,l.local_telefono,l.local_email,e.estado_nombre,mp.metodo_pago_nombre,mp.metodo_pago_descripcion,
         r.id_repartidor,r.id_usuario AS repartidor_id_usuario,r.repartidor_codigo,r.repartidor_placa,r.repartidor_tipo_vehiculo,r.repartidor_calificacion,r.repartidor_posicion_ranking,r.repartidor_total_pedidos,r.repartidor_pedidos_aceptados,r.repartidor_pedidos_rechazados,r.repartidor_porcentaje_aceptacion,
         ur.usuario_nombre AS repartidor_nombre,ur.usuario_apellido AS repartidor_apellido,ur.usuario_nombre_completo AS repartidor_nombre_completo,ur.usuario_telefono AS repartidor_telefono,ur.usuario_foto AS repartidor_foto
         FROM pedidos p
@@ -1487,7 +1489,8 @@ export const postPedido = async (req, res) => {
         transaccionIniciada = false;
         const pedidoFinal = await obtenerPedidoPorIdInterno(id_pedido);
         emitirEventoPedido("nuevo_pedido", pedidoFinal);
-        void notificarNuevoPedidoAlLocal(pedidoFinal).catch(error => console.error("[Pedidos] Error enviando push de nuevo pedido:", error));
+        //void notificarNuevoPedidoAlLocal(pedidoFinal).catch(error => console.error("[Pedidos] Error enviando push de nuevo pedido:", error));
+        void notificationService.notifyOrderCreated(pedidoFinal).catch(error => console.error("[Pedidos] Error notificando nuevo pedido:", error));
         return res.status(201).json({
             success: true,
             id_pedido,
@@ -1543,12 +1546,14 @@ export const putPedido = async (req, res) => {
         if (!puedeModificarPedidos(req)) return res.status(403).json({ success: false, message: "No tienes permisos para modificar este pedido." });
 
         let transicionAEnPreparacion = false, liberaRepartidor = false;
+        let nuevoEstadoNombre = null;
         if (req.body.id_estado !== undefined && req.body.id_estado !== null) {
             const validacionEstado = await validarTransicionEstado(req, pedido, req.body.id_estado);
             if (!validacionEstado.valido) return res.status(validacionEstado.status).json({ success: false, message: validacionEstado.message, codigo: validacionEstado.codigo ?? undefined });
 
             transicionAEnPreparacion = !validacionEstado.mismoEstado && validacionEstado.estadoActual === "PENDIENTE" && validacionEstado.nuevoEstado === "EN_PREPARACION";
             liberaRepartidor = !validacionEstado.mismoEstado && validacionEstado.estadoActual === "EN_CAMINO" && ["ENTREGADO", "NO_ENTREGADO"].includes(validacionEstado.nuevoEstado);
+            if (!validacionEstado.mismoEstado) nuevoEstadoNombre = validacionEstado.nuevoEstado;
         }
 
         const campos = [], valores = [];
@@ -1588,7 +1593,11 @@ export const putPedido = async (req, res) => {
         const pedidoActualizado = await obtenerPedidoPorIdInterno(id);
         if (campos.length) {
           emitirEventoPedido("pedido_actualizado", pedidoActualizado);
-          void notificarNuevoPedidoAlLocal(pedidoActualizado, "pedido_actualizado").catch(error => console.error("[Pedidos] Error enviando push de pedido actualizado:", error));
+          //void notificarNuevoPedidoAlLocal(pedidoActualizado, "pedido_actualizado").catch(error => console.error("[Pedidos] Error enviando push de pedido actualizado:", error));
+        if (nuevoEstadoNombre) {
+            void notificationService.notifyOrderStatusChanged(pedidoActualizado, nuevoEstadoNombre, obtenerIdUsuario(req))
+              .catch(error => console.error("[Pedidos] Error notificando cambio de estado:", error));
+          }
         }
         return res.json({ success: true, ...ocultarPedidoPin(pedidoActualizado, req), pago_local: pagoLocal, pago_repartidor: pagoRepartidor, asignacion });
     } catch (error) {
@@ -1606,7 +1615,7 @@ export const confirmarPagoPedido = async (req, res) => {
         if (!tieneRol(req, ["SOPORTE", "ADMINISTRADOR"])) return res.status(403).json({ success: false, message: "No tienes permisos para confirmar pagos." });
         const [resultado] = await conmysql.query(`UPDATE pedidos SET pedido_pago_confirmado=1 WHERE id_pedido=?`, [id]);
 
-            if (pedidoActualizado?.cliente_id_usuario) {
+/*             if (pedidoActualizado?.cliente_id_usuario) {
                 await crearNotificacion({
                     id_usuario_destino: pedidoActualizado.cliente_id_usuario,
                     tipo: "PEDIDO",
@@ -1615,10 +1624,12 @@ export const confirmarPagoPedido = async (req, res) => {
                     referencia_tipo: "PEDIDO",
                     referencia_id: pedidoActualizado.id_pedido
                 });
-            }
+            } */
         
         if (!resultado.affectedRows) return res.status(404).json({ success: false, message: "Pedido no encontrado." });
         const pedidoActualizado = await obtenerPedidoPorIdInterno(id);
+        void notificationService.notifyPaymentConfirmed(pedidoActualizado, obtenerIdUsuario(req))
+            .catch(error => console.error("[Pedidos] Error notificando pago confirmado:", error));
         return res.json({ success: true, message: "Pago confirmado correctamente.", ...ocultarPedidoPin(pedidoActualizado, req) });
     } catch (error) {
         console.error("[Pedidos] Error confirmarPagoPedido:", error);
@@ -1662,6 +1673,8 @@ export const entregarPedidoConPin = async (req, res) => {
         catch (error) { console.error("[Pedidos] Error sincronizando estado del repartidor tras PIN:", error); }
 
         const pedidoActualizado = await obtenerPedidoPorIdInterno(id);
+        void notificationService.notifyOrderDelivered(pedidoActualizado, obtenerIdUsuario(req))
+            .catch(error => console.error("[Pedidos] Error notificando entrega:", error));
         return res.json({ success: true, message: "Pedido entregado con éxito.", pedido: ocultarPedidoPin(pedidoActualizado, req), pago_local: pagoLocal, pago_repartidor: pagoRepartidor });
     } catch (error) {
         console.error("[Pedidos] Error entregarPedidoConPin:", error);
@@ -1765,16 +1778,9 @@ export const cancelarPedido = async (req, res) => {
 
         const pedidoActualizado = await obtenerPedidoPorIdInterno(id);
         const destinatarios = [pedido.cliente_id_usuario, pedidoActualizado?.local_id_usuario, pedidoActualizado?.repartidor_id_usuario].filter(Boolean);
-        // Nota: cliente_id_usuario / local_id_usuario / repartidor_id_usuario deben venir en el SELECT de obtenerPedidoPorIdInterno;
-        // si no los tienes ahí, resuélvelos con una consulta rápida a usuarios vía obtenerLocalDelUsuario/obtenerClienteDelUsuario o un JOIN adicional.
-        await crearNotificacionesMasivas(destinatarios, {
-            tipo: "PEDIDO",
-            titulo: "Pedido cancelado",
-            mensaje: `El pedido ${pedido.pedido_codigo} fue cancelado${motivo ? `: ${motivo}` : "."}`,
-            referencia_tipo: "PEDIDO",
-            referencia_id: pedido.id_pedido
-        });
         emitirEventoPedido("pedido_cancelado", pedidoActualizado);
+        void notificationService.notifyOrderCancelled(pedidoActualizado, motivo, obtenerIdUsuario(req))
+            .catch(error => console.error("[Pedidos] Error notificando cancelación:", error));
         void notificarNuevoPedidoAlLocal(pedidoActualizado, "pedido_cancelado").catch(error => console.error("[Pedidos] Error enviando push de pedido cancelado:", error));
         return res.json({ success: true, message: "Pedido cancelado correctamente.", ...ocultarPedidoPin(pedidoActualizado, req) });
     } catch (error) {
