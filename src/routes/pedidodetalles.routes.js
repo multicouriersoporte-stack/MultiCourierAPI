@@ -16,7 +16,7 @@ const ROLES_GET = ["CLIENTE", "LOCAL", "REPARTIDOR", "CENTRAL", "SUPERVISOR", "S
 router.get("/pedidos-detalles", getPedidosDetalles);
 router.get("/pedidos-detalles/:id", getPedidoDetallePorId);
 //router.get("/pedidos/:id_pedido/detalles", getDetallesPorPedido);
-router.get("/pedidos/:id/detalles", verificarToken, permitirRoles(...ROLES_GET), getPedidoDetalles);
+//router.get("/pedidos/:id/detalles", verificarToken, permitirRoles(...ROLES_GET), getPedidoDetalles);
 router.get("/local-productos/:id_local_producto/pedidos-detalles", getDetallesPorLocalProducto);
 
 // Rutas CRUD
