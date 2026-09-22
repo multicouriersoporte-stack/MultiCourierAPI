@@ -1,4 +1,5 @@
 import { conmysql } from "../db.js";
+import { notificationService } from "../notifications/notification.service.js";
 
 // Configuración
 const RADIOS_ASIGNACION = [3, 6, 10, 16];
