@@ -5,6 +5,8 @@ import {
     getPedidosDetalles, getPedidoDetallePorId, getDetallesPorPedido, getDetallesPorLocalProducto,
     postPedidoDetalle, putPedidoDetalle, patchPedidoDetalle, deletePedidoDetalle
 } from "../controladores/pedidodetallesCtrl.js";
+import { verificarToken } from "../middlewares/auth.middleware.js";
+import { permitirRoles } from "../middlewares/roles.middleware.js";
 
 const router = Router();
 
