@@ -271,25 +271,43 @@ export const putUsuarios = async (req, res) => {
     }
 };
 
-// Actualización parcial. Solo CENTRAL y ADMINISTRADOR.
+// Actualización parcial. Solo CENTRAL y ADMINISTRADOR (o el propio usuario autenticado).
 export const patchUsuarios = async (req, res) => {
     try {
         const { id } = req.params;
         const camposPermitidos = [
             "usuario_nombre", "usuario_apellido", "usuario_email", "usuario_telefono",
             "usuario_foto", "usuario_fecha_nacimiento", "usuario_latitud", "usuario_longitud",
-            "usuario_referencia", "usuario_billetera"
+            "usuario_referencia", "usuario_billetera", "usuario_password"
         ];
         const campos = [], valores = [];
 
         // Verificar existencia.
-        const [usuario] = await conmysql.query(`SELECT id_usuario FROM usuarios WHERE id_usuario = ?`, [id]);
+        const [usuario] = await conmysql.query(
+            `SELECT id_usuario, usuario_nombre, usuario_apellido FROM usuarios WHERE id_usuario = ?`,
+            [id]
+        );
         if (!usuario.length) return res.status(404).json({ message: "Usuario no encontrado" });
+
+        let nombreActual = usuario[0].usuario_nombre;
+        let apellidoActual = usuario[0].usuario_apellido;
 
         // Construir actualización.
         for (const campo of camposPermitidos) {
             if (req.body[campo] === undefined) continue;
             let valor = req.body[campo];
+
+            if (campo === "usuario_password") {
+                if (typeof valor !== "string" || valor.length < 6)
+                    return res.status(400).json({ message: "La contraseña debe tener al menos 6 caracteres" });
+                if (valor.length > 50)
+                    return res.status(400).json({ message: "La contraseña no puede superar 50 caracteres" });
+                valor = await bcrypt.hash(valor, 10);
+                campos.push("usuario_password = ?");
+                valores.push(valor);
+                continue;
+            }
+
             if (typeof valor === "string") valor = valor.trim();
 
             if (campo === "usuario_email") {
@@ -297,6 +315,31 @@ export const patchUsuarios = async (req, res) => {
                 valor = valor.toLowerCase();
                 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor))
                     return res.status(400).json({ message: "El correo electrónico no es válido" });
+            }
+
+            if (campo === "usuario_telefono") {
+                if (valor && !/^[0-9]+$/.test(valor))
+                    return res.status(400).json({ message: "El teléfono solo puede contener números" });
+                if (valor && valor.length > 13)
+                    return res.status(400).json({ message: "El teléfono no puede superar 13 dígitos" });
+            }
+
+            if (campo === "usuario_nombre") {
+                if (!valor) return res.status(400).json({ message: "El nombre no puede estar vacío" });
+                if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$/.test(valor))
+                    return res.status(400).json({ message: "El nombre solo puede contener letras" });
+                if (valor.length > 100)
+                    return res.status(400).json({ message: "El nombre no puede superar 100 caracteres" });
+                nombreActual = valor;
+            }
+
+            if (campo === "usuario_apellido") {
+                if (!valor) return res.status(400).json({ message: "El apellido no puede estar vacío" });
+                if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$/.test(valor))
+                    return res.status(400).json({ message: "El apellido solo puede contener letras" });
+                if (valor.length > 100)
+                    return res.status(400).json({ message: "El apellido no puede superar 100 caracteres" });
+                apellidoActual = valor;
             }
 
             if (campo === "usuario_billetera") {
@@ -318,19 +361,33 @@ export const patchUsuarios = async (req, res) => {
         if (req.body.usuario_email !== undefined) {
             const email = req.body.usuario_email.trim().toLowerCase();
             const [existente] = await conmysql.query(
-                `SELECT id_usuario FROM usuarios WHERE usuario_email = ? AND id_usuario <> ? LIMIT 1`, [email, id]
+                `SELECT id_usuario FROM usuarios WHERE usuario_email = ? AND id_usuario <> ? LIMIT 1`,
+                [email, id]
             );
-            if (existente.length) return res.status(409).json({ message: "El correo electrónico ya está registrado" });
+            if (existente.length)
+                return res.status(409).json({ message: "El correo electrónico ya está registrado" });
+        }
+
+        // Recalcular nombre completo si cambió nombre o apellido.
+        if (req.body.usuario_nombre !== undefined || req.body.usuario_apellido !== undefined) {
+            campos.push("usuario_nombre_completo = ?");
+            valores.push(`${nombreActual} ${apellidoActual}`.trim());
         }
 
         campos.push("usuario_fecha_actualizacion = NOW()");
         valores.push(id);
 
-        // Ejecutar actualización.
         await conmysql.query(`UPDATE usuarios SET ${campos.join(", ")} WHERE id_usuario = ?`, valores);
 
-        const [rows] = await conmysql.query(`SELECT ${camposUsuario} FROM usuarios WHERE id_usuario = ?`, [id]);
-        return res.json({ success: true, message: "Usuario actualizado correctamente", usuario: rows[0] });
+        const [rows] = await conmysql.query(
+            `SELECT ${camposUsuario} FROM usuarios WHERE id_usuario = ?`,
+            [id]
+        );
+        return res.json({
+            success: true,
+            message: "Usuario actualizado correctamente",
+            usuario: rows[0]
+        });
     } catch (error) {
         console.error("Error patchUsuarios:", error);
         if (error.code === "ER_DUP_ENTRY")
