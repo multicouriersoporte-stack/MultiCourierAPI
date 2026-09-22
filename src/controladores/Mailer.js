@@ -1,54 +1,48 @@
-import nodemailer from "nodemailer";
+// Variables de entorno requeridas: BREVO_API_KEY, MAIL_FROM (ej: multicouriersoporte@gmail.com)
+// BREVO_API_KEY se obtiene en Brevo > SMTP & API > API Keys.
+// El remitente (MAIL_FROM) debe estar verificado en Brevo > Senders, Domains & Dedicated IPs.
 
-// Variables de entorno requeridas (.env local y variables de entorno en Render):
-//   MAIL_HOST, MAIL_PORT, MAIL_USER, MAIL_PASS
-//
-// El transporter se crea de forma PEREZOSA (solo la primera vez que se necesita enviar
-// un correo), para no depender del orden en que se cargan los modulos / dotenv.
+const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
 
-let transporterCache = null;
-
-function obtenerTransporter() {
-    if (transporterCache) return transporterCache;
-
-    const { MAIL_HOST, MAIL_PORT, MAIL_USER, MAIL_PASS } = process.env;
-
-    if (!MAIL_HOST || !MAIL_USER || !MAIL_PASS) {
+async function enviarViaBrevo({ to, subject, html }) {
+    const { BREVO_API_KEY, MAIL_FROM } = process.env;
+    if (!BREVO_API_KEY || !MAIL_FROM) {
         throw new Error(
-            "Configuracion de correo incompleta: revisa MAIL_HOST, MAIL_USER y MAIL_PASS en las variables de entorno."
+            "Configuracion de correo incompleta: revisa BREVO_API_KEY y MAIL_FROM en las variables de entorno."
         );
     }
 
-    transporterCache = nodemailer.createTransport({
-        host: MAIL_HOST,
-        port: Number(MAIL_PORT || 587),
-        secure: String(MAIL_PORT) === "465",
-        auth: { user: MAIL_USER, pass: MAIL_PASS },
-        // Render no tiene salida IPv6; Gmail a veces resuelve a una IP IPv6 y la conexion
-        // falla con ENETUNREACH. Forzamos IPv4 explicitamente.
-        family: 4,
-        // Temporal: deja ver en los logs de Render el intercambio SMTP real (auth, TLS, etc.)
-        // Quita estas dos lineas una vez que el envio funcione, para no llenar los logs.
-        logger: true,
-        debug: true
+    const respuesta = await fetch(BREVO_URL, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "api-key": BREVO_API_KEY
+        },
+        body: JSON.stringify({
+            sender: { name: "MultiCourier", email: MAIL_FROM },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html
+        })
     });
 
-    return transporterCache;
+    if (!respuesta.ok) {
+        const detalle = await respuesta.text().catch(() => "");
+        throw new Error(`Brevo respondio ${respuesta.status}: ${detalle}`);
+    }
 }
 
-// Prueba la conexion/autenticacion SMTP sin enviar ningun correo.
-// Utilidad de diagnostico: expone el error real (auth invalida, puerto bloqueado, timeout, etc.)
+// Prueba la configuracion sin enviar un correo real (chequeo simple de credenciales).
 export const verificarConexionCorreo = async () => {
-    const transporter = obtenerTransporter();
-    return transporter.verify(); // Lanza si algo falla; resuelve true si todo esta bien.
+    const { BREVO_API_KEY } = process.env;
+    if (!BREVO_API_KEY) throw new Error("Falta BREVO_API_KEY");
+    return true;
 };
 
 // Envia el correo con el codigo de verificacion de 6 digitos.
 export const enviarCorreoCodigo = async (destino, codigo) => {
-    const transporter = obtenerTransporter();
-
-    await transporter.sendMail({
-        from: `"MultiCourier" <${process.env.MAIL_USER}>`,
+    await enviarViaBrevo({
         to: destino,
         subject: "Tu codigo de verificacion - MultiCourier",
         html: `
