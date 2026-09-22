@@ -5,7 +5,7 @@ import { PORT } from "./config.js";
 import http from "http";
 import { Server } from "socket.io";
 import { setupWebSocket } from "./ws/websocket.js";
-import { inicializarFOMPush } from "./ws/FCMPush.js";
+import { inicializarFCMPush } from "./ws/FCMPush.js";
 
 // Servidor HTTP + Socket.IO
 const server = http.createServer(app);
@@ -22,7 +22,7 @@ setupWebSocket(io);
 
 // Firebase Cloud Messaging: no impide iniciar el servidor si falla.
 try {
-    inicializarFOMPush();
+    inicializarFCMPush();
     console.log("☁️ Firebase Cloud Messaging habilitado");
 } catch (error) {
     console.error("❌ No se pudo inicializar Firebase Cloud Messaging:", error?.message || error);
