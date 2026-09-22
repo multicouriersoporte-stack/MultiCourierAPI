@@ -5,7 +5,7 @@
 // notificacionesCtrl.js en vez de duplicar SQL de inserción de historial.
 
 import { conmysql } from "../db.js";
-import { crearNotificacion, crearNotificacionesMasivas } from "../controllers/notificacionesCtrl.js";
+import { crearNotificacion, crearNotificacionesMasivas } from "../controladores/notificacionesCtrl.js";
 
 // Guarda el historial para uno o varios destinatarios con el mismo
 // título/mensaje. `destinatarios` es un array de id_usuario.
