@@ -1384,28 +1384,6 @@ export const getPedidosPorEstado = async (req, res) => {
     }
 };
 
-// Recalcula y persiste los totales del pedido a partir de sus detalles reales.
-// Se ejecuta tras cualquier alta/edición/baja de un detalle para que
-// pedidos.pedido_cantidad_productos y los subtotales nunca queden desincronizados.
-const recalcularTotalesPedido = async (id_pedido) => {
-    const [[totales]] = await conmysql.query(`
-        SELECT
-            COALESCE(SUM(pedido_detalle_cantidad), 0)        AS cantidad_total,
-            COALESCE(SUM(pedido_detalle_subtotal_local), 0)  AS subtotal_local,
-            COALESCE(SUM(pedido_detalle_subtotal_app), 0)    AS subtotal_app
-        FROM pedido_detalles
-        WHERE id_pedido = ?
-    `, [id_pedido]);
-
-    await conmysql.query(`
-        UPDATE pedidos
-        SET pedido_cantidad_productos = ?,
-            pedido_subtotal_local = ?,
-            pedido_subtotal_app = ?
-        WHERE id_pedido = ?
-    `, [totales.cantidad_total, totales.subtotal_local, totales.subtotal_app, id_pedido]);
-};
-
 export const postPedido = async (req, res) => {
     const conexion = await conmysql.getConnection();
     let id_pedido = null, pedido_pin = null, transaccionIniciada = false;
