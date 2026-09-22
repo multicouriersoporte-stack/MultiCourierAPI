@@ -155,7 +155,8 @@ export const registrarCliente = async (req, res) => {
 
 import bcrypt from "bcrypt";
 import { conmysql } from "../db.js";
-import admin from "../config/firebaseAdmin.js"; // ajusta la ruta a donde guardes firebaseAdmin.js
+//import admin from "../config/firebaseAdmin.js"; // ajusta la ruta a donde guardes firebaseAdmin.js
+import { getAuth } from "../config/firebaseAdmin.js";
 
 // Rol asignado automáticamente al autorregistrarse como cliente.
 const ID_ROL_CLIENTE = 1;
