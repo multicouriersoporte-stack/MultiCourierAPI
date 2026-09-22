@@ -1292,7 +1292,7 @@ export const getPedidoPorId = async (req, res) => {
     }
 };
 
-export const getPedidoDetalles = async (req, res) => {
+/* export const getPedidoDetalles = async (req, res) => {
     try {
         const { id } = req.params;
         if (!esIdValido(id)) return res.status(400).json({ success: false, message: "El ID del pedido no es válido." });
@@ -1301,6 +1301,26 @@ export const getPedidoDetalles = async (req, res) => {
     } catch (error) {
         console.error("[Pedidos] Error getPedidoDetalles:", error);
         return res.status(500).json({ success: false, message: "Error al obtener los detalles del pedido." });
+    }
+}; */
+// controladores/pedidosCtrl.js — getPedidoDetalles
+export const getPedidoDetalles = async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (!esIdValido(id)) return res.status(400).json({ success: false, message: "El ID del pedido no es válido." });
+        if (!await obtenerPedidoPorIdInterno(id)) return res.status(404).json({ success: false, message: "Pedido no encontrado" });
+        return res.json({ success: true, detalles: await obtenerDetallesPedido(id) });
+    } catch (error) {
+        // Antes: el error real (p.ej. agotamiento de conexiones) quedaba oculto.
+        console.error(`[Pedidos] Error getPedidoDetalles (id_pedido=${req.params.id}):`, error.code || error.message, error);
+        const esErrorConexion = ["ER_CON_COUNT_ERROR", "PROTOCOL_CONNECTION_LOST", "ECONNRESET", "PoolClosedError"].includes(error.code);
+        return res.status(esErrorConexion ? 503 : 500).json({
+            success: false,
+            message: esErrorConexion
+                ? "El servidor está ocupado procesando muchas solicitudes. Intenta de nuevo en unos segundos."
+                : "Error al obtener los detalles del pedido.",
+            codigo: error.code || undefined
+        });
     }
 };
 
