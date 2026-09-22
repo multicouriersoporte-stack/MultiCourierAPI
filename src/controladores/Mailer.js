@@ -3,10 +3,8 @@ import nodemailer from "nodemailer";
 // Variables de entorno requeridas (.env local y variables de entorno en Render):
 //   MAIL_HOST, MAIL_PORT, MAIL_USER, MAIL_PASS
 //
-// IMPORTANTE: el transporter se crea de forma PEREZOSA (la primera vez que se necesita
-// enviar un correo), nunca al cargar este archivo. Si se crea al cargar el módulo y tu
-// dotenv.config() todavía no corrió (por orden de imports), nodemailer usa localhost:587
-// por defecto y truena con ECONNREFUSED 127.0.0.1:587 — que es justo lo que estabas viendo.
+// El transporter se crea de forma PEREZOSA (solo la primera vez que se necesita enviar
+// un correo), para no depender del orden en que se cargan los modulos / dotenv.
 
 let transporterCache = null;
 
@@ -25,11 +23,25 @@ function obtenerTransporter() {
         host: MAIL_HOST,
         port: Number(MAIL_PORT || 587),
         secure: String(MAIL_PORT) === "465",
-        auth: { user: MAIL_USER, pass: MAIL_PASS }
+        auth: { user: MAIL_USER, pass: MAIL_PASS },
+        // Render no tiene salida IPv6; Gmail a veces resuelve a una IP IPv6 y la conexion
+        // falla con ENETUNREACH. Forzamos IPv4 explicitamente.
+        family: 4,
+        // Temporal: deja ver en los logs de Render el intercambio SMTP real (auth, TLS, etc.)
+        // Quita estas dos lineas una vez que el envio funcione, para no llenar los logs.
+        logger: true,
+        debug: true
     });
 
     return transporterCache;
 }
+
+// Prueba la conexion/autenticacion SMTP sin enviar ningun correo.
+// Utilidad de diagnostico: expone el error real (auth invalida, puerto bloqueado, timeout, etc.)
+export const verificarConexionCorreo = async () => {
+    const transporter = obtenerTransporter();
+    return transporter.verify(); // Lanza si algo falla; resuelve true si todo esta bien.
+};
 
 // Envia el correo con el codigo de verificacion de 6 digitos.
 export const enviarCorreoCodigo = async (destino, codigo) => {
