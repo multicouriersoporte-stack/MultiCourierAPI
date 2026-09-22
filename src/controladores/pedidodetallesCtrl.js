@@ -81,6 +81,28 @@ export const getDetallesPorLocalProducto = async (req, res) => {
     }
 };
 
+// Recalcula y persiste los totales del pedido a partir de sus detalles reales.
+// Se ejecuta tras cualquier alta/edición/baja de un detalle para que
+// pedidos.pedido_cantidad_productos y los subtotales nunca queden desincronizados.
+const recalcularTotalesPedido = async (id_pedido) => {
+    const [[totales]] = await conmysql.query(`
+        SELECT
+            COALESCE(SUM(pedido_detalle_cantidad), 0)        AS cantidad_total,
+            COALESCE(SUM(pedido_detalle_subtotal_local), 0)  AS subtotal_local,
+            COALESCE(SUM(pedido_detalle_subtotal_app), 0)    AS subtotal_app
+        FROM pedido_detalles
+        WHERE id_pedido = ?
+    `, [id_pedido]);
+
+    await conmysql.query(`
+        UPDATE pedidos
+        SET pedido_cantidad_productos = ?,
+            pedido_subtotal_local = ?,
+            pedido_subtotal_app = ?
+        WHERE id_pedido = ?
+    `, [totales.cantidad_total, totales.subtotal_local, totales.subtotal_app, id_pedido]);
+};
+
 // POST: Crear detalle de pedido
 export const postPedidoDetalle = async (req, res) => {
     try {
@@ -129,6 +151,8 @@ export const postPedidoDetalle = async (req, res) => {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `, [id_pedido, id_local_producto, cantidad, precioLocal, precioApp, subtotalLocal, subtotalApp, pedido_detalle_observacion ?? null]);
 
+        await recalcularTotalesPedido(id_pedido);
+        
         const [rows] = await conmysql.query(`
             SELECT pd.*, p.pedido_codigo, p.id_cliente, p.id_local, lp.id_producto, l.local_nombre_comercial, pr.producto_codigo, pr.producto_nombre
             FROM pedido_detalles pd
@@ -185,6 +209,8 @@ export const putPedidoDetalle = async (req, res) => {
             WHERE id_pedido_detalle = ?
         `, [id_pedido, id_local_producto, cantidad, precioLocal, precioApp, subtotalLocal, subtotalApp, pedido_detalle_observacion ?? null, id]);
 
+        await recalcularTotalesPedido(id_pedido);
+        
         if (result.affectedRows === 0) return res.status(404).json({ message: "Detalle de pedido no encontrado" });
 
         const [rows] = await conmysql.query(`SELECT * FROM pedido_detalles WHERE id_pedido_detalle = ?`, [id]);
@@ -210,6 +236,9 @@ export const patchPedidoDetalle = async (req, res) => {
             }
         }
 
+        const [detalleActual] = await conmysql.query(`SELECT id_pedido FROM pedido_detalles WHERE id_pedido_detalle = ?`, [id]);
+        if (detalleActual.length) await recalcularTotalesPedido(detalleActual[0].id_pedido);
+        
         if (campos.length === 0) return res.status(400).json({ message: "No se proporcionaron campos para actualizar" });
 
         // Validar cantidad y precios recibidos.
@@ -239,11 +268,25 @@ export const patchPedidoDetalle = async (req, res) => {
 };
 
 // DELETE: Eliminar detalle
-export const deletePedidoDetalle = async (req, res) => {
+/* export const deletePedidoDetalle = async (req, res) => {
     try {
         const { id } = req.params;
         const [result] = await conmysql.query(`DELETE FROM pedido_detalles WHERE id_pedido_detalle = ?`, [id]);
         if (result.affectedRows === 0) return res.status(404).json({ id_pedido_detalle: 0, message: "Detalle de pedido no encontrado" });
+        return res.status(204).send();
+    } catch (error) {
+        console.error("Error deletePedidoDetalle:", error);
+        return res.status(500).json({ message: "Error al eliminar detalle de pedido", error: error.message });
+    }
+}; */
+// deletePedidoDetalle — hay que leer id_pedido ANTES de borrar
+export const deletePedidoDetalle = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const [detalle] = await conmysql.query(`SELECT id_pedido FROM pedido_detalles WHERE id_pedido_detalle = ?`, [id]);
+        const [result] = await conmysql.query(`DELETE FROM pedido_detalles WHERE id_pedido_detalle = ?`, [id]);
+        if (result.affectedRows === 0) return res.status(404).json({ id_pedido_detalle: 0, message: "Detalle de pedido no encontrado" });
+        if (detalle.length) await recalcularTotalesPedido(detalle[0].id_pedido);
         return res.status(204).send();
     } catch (error) {
         console.error("Error deletePedidoDetalle:", error);
