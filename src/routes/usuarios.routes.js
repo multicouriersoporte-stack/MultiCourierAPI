@@ -37,7 +37,9 @@ import {
     patchUsuarios, deleteUsuarios
 } from "../controladores/usuariosCtrl.js";
 import { registrarCliente } from "../controladores/registroCtrl.js";
-import { enviarCodigoVerificacion, verificarCodigoEmail } from "../controladores/emailVerificacionCtrl.js";
+import {
+    enviarCodigoVerificacion, verificarCodigoEmail, consultarEstadoVerificacion
+} from "../controladores/EmailverificacionCtrl.js";
 
 const router = Router();
 
@@ -47,13 +49,15 @@ router.get("/usuarios/cedula/:cedula", getUsuarioPorCedula);
 router.get("/usuarios/email/:email", getUsuarioPorEmail);
 router.get("/usuarios/codigo/:codigo", getUsuarioPorCodigo);
 router.get("/usuarios/:id_usuario/repartidor", getRepartidorPorUsuario);
-router.get("/usuarios/:id", getUsuarioxid); // Después de las rutas específicas.
 
-// Verificación de correo (previa al registro público).
+// Verificacion de correo (previa al registro publico).
 router.post("/usuarios/enviar-codigo", enviarCodigoVerificacion);
 router.post("/usuarios/verificar-codigo", verificarCodigoEmail);
+router.get("/usuarios/estado-verificacion/:email", consultarEstadoVerificacion);
 
-// Registro público de cliente (crea usuario + cliente + rol en una transacción).
+router.get("/usuarios/:id", getUsuarioxid); // Despues de las rutas especificas.
+
+// Registro publico de cliente (crea usuario + cliente + rol en una transaccion).
 router.post("/usuarios/registro-cliente", registrarCliente);
 
 // Crear y modificar (uso administrativo).
