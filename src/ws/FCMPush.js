@@ -224,7 +224,7 @@ export default FOMPush;
 
 import { getFCMMessaging } from "../config/firebase-admin.js";
 
-const CANAL_NOTIFICACIONES = "orders";
+const CANAL_NOTIFICACIONES = "orders_v1";
 
 // Envía un Push a un único dispositivo.
 export const enviarPush = async (token, { titulo = "MultiCourier", mensaje = "", datos = {}, sonido = "default" } = {}) => {
