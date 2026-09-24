@@ -7,7 +7,7 @@ const PORCENTAJE_COMISION_LOCAL = 1;
  * Obtiene únicamente los pagos del local del usuario autenticado.
  * El id_local se obtiene mediante verificarToken.
  */
-export const getMisPagosLocales = async (req, res) => {
+/* export const getMisPagosLocales = async (req, res) => {
     try {
         //console.log("[PagosLocales] Usuario autenticado:", req.usuario);
         const idUsuario = Number(req.usuario?.id_usuario ?? req.usuario?.usuario_id ?? req.usuario?.idUsuario ?? req.usuario?.id ?? req.usuario?.usuarioId); // Obtiene el ID del usuario autenticado
@@ -36,6 +36,35 @@ export const getMisPagosLocales = async (req, res) => {
             `SELECT * FROM pagos_locales WHERE id_local = ? ORDER BY pago_local_fecha DESC, id_pago_local DESC`,
             [idLocal]
         ); // Consulta únicamente los pagos del local asociado
+
+        console.log(`[PagosLocales] Se encontraron ${pagos.length} pagos para el local ${idLocal}`);
+        return res.json(pagos);
+    } catch (error) {
+        console.error("[PagosLocales] Error getMisPagosLocales:", error);
+        return res.status(500).json({ success: false, message: "Error al consultar los pagos del local", error: error.message });
+    }
+}; */
+export const getMisPagosLocales = async (req, res) => {
+    try {
+        const idUsuario = Number(req.usuario?.id_usuario ?? req.usuario?.usuario_id ?? req.usuario?.idUsuario ?? req.usuario?.id ?? req.usuario?.usuarioId);
+        if (!Number.isInteger(idUsuario) || idUsuario <= 0) return res.status(403).json({ success: false, message: "No se pudo identificar al usuario autenticado." });
+
+        console.log(`[PagosLocales] Buscando local asociado al usuario ${idUsuario}`);
+        const [locales] = await conmysql.query(
+            `SELECT id_local, id_usuario, local_codigo, local_nombre_comercial, local_razon_social FROM locales WHERE id_usuario = ? LIMIT 1`,
+            [idUsuario]
+        );
+        if (locales.length === 0) return res.status(403).json({ success: false, message: "El usuario autenticado no tiene un local asociado." });
+
+        const local = locales[0], idLocal = Number(local.id_local);
+        if (!Number.isInteger(idLocal) || idLocal <= 0) return res.status(403).json({ success: false, message: "El local asociado al usuario no es válido." });
+
+        console.log(`[PagosLocales] Usuario ${idUsuario} pertenece al local ${idLocal} (${local.local_nombre_comercial ?? "SIN NOMBRE"})`);
+        const [pagos] = await conmysql.query(
+            `SELECT pl.*, COALESCE((SELECT SUM(a.pago_ajuste_monto) FROM pagos_ajustes a WHERE a.pago_ajuste_beneficiario = 'LOCAL' AND a.id_pago = pl.id_pago_local), 0) AS pago_local_ajustes
+             FROM pagos_locales pl WHERE pl.id_local = ? ORDER BY pl.pago_local_fecha DESC, pl.id_pago_local DESC`,
+            [idLocal]
+        );
 
         console.log(`[PagosLocales] Se encontraron ${pagos.length} pagos para el local ${idLocal}`);
         return res.json(pagos);
