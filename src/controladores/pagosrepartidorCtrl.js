@@ -619,6 +619,11 @@ export const getPagoRepartidorPorPedido = async (req, res) => {
       SELECT pr.*,p.pedido_codigo,p.id_repartidor,p.pedido_carrera,p.pedido_propina,
              pr.pago_repartidor_carrera,pr.pago_repartidor_propina,pr.pago_repartidor_otros,pr.pago_repartidor_total,
              r.repartidor_codigo,u.usuario_nombre,u.usuario_apellido,u.usuario_nombre_completo,r.id_usuario AS repartidor_id_usuario
+
+              mp.metodo_pago_nombre, pr.pago_repartidor_metodo_tipo,
+              COALESCE((SELECT SUM(a.pago_ajuste_monto) FROM pagos_ajustes a WHERE a.pago_ajuste_beneficiario='REPARTIDOR' AND a.id_pago=pr.id_pago_repartidor),0) AS pago_repartidor_ajustes,
+              (pr.pago_repartidor_carrera + pr.pago_repartidor_comision) AS pago_repartidor_carrera_bruta
+             
       FROM pagos_repartidor pr
       INNER JOIN pedidos p ON pr.id_pedido = p.id_pedido
       LEFT JOIN repartidores r ON pr.id_repartidor = r.id_repartidor
@@ -664,6 +669,11 @@ export const getMisPagosRepartidor = async (req, res) => {
       SELECT pr.*,p.pedido_codigo,p.pedido_fecha,p.pedido_fecha_entrega,p.pedido_carrera,p.pedido_propina,
              pr.pago_repartidor_carrera,pr.pago_repartidor_propina,pr.pago_repartidor_otros,pr.pago_repartidor_total,
              l.local_nombre_comercial
+
+              mp.metodo_pago_nombre, pr.pago_repartidor_metodo_tipo,
+              COALESCE((SELECT SUM(a.pago_ajuste_monto) FROM pagos_ajustes a WHERE a.pago_ajuste_beneficiario='REPARTIDOR' AND a.id_pago=pr.id_pago_repartidor),0) AS pago_repartidor_ajustes,
+              (pr.pago_repartidor_carrera + pr.pago_repartidor_comision) AS pago_repartidor_carrera_bruta
+             
       FROM pagos_repartidor pr
       INNER JOIN pedidos p ON pr.id_pedido = p.id_pedido
       LEFT JOIN locales l ON p.id_local = l.id_local
@@ -719,6 +729,11 @@ export const getPagosRepartidores = async (req, res) => {
       SELECT pr.*,p.pedido_codigo,p.pedido_fecha,p.pedido_fecha_entrega,p.pedido_total,p.pedido_carrera,p.pedido_propina,
              pr.pago_repartidor_carrera,pr.pago_repartidor_propina,pr.pago_repartidor_otros,pr.pago_repartidor_total,
              r.repartidor_codigo,r.id_usuario AS repartidor_id_usuario,u.usuario_nombre,u.usuario_apellido,u.usuario_nombre_completo
+
+              mp.metodo_pago_nombre, pr.pago_repartidor_metodo_tipo,
+              COALESCE((SELECT SUM(a.pago_ajuste_monto) FROM pagos_ajustes a WHERE a.pago_ajuste_beneficiario='REPARTIDOR' AND a.id_pago=pr.id_pago_repartidor),0) AS pago_repartidor_ajustes,
+              (pr.pago_repartidor_carrera + pr.pago_repartidor_comision) AS pago_repartidor_carrera_bruta
+             
       FROM pagos_repartidor pr
       INNER JOIN pedidos p ON pr.id_pedido = p.id_pedido
       INNER JOIN repartidores r ON pr.id_repartidor = r.id_repartidor
