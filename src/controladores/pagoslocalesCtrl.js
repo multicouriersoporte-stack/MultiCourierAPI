@@ -32,15 +32,16 @@ export const getMisPagosLocales = async (req, res) => {
 
         console.log(`[PagosLocales] Usuario ${idUsuario} pertenece al local ${idLocal} (${local.local_nombre_comercial ?? "SIN NOMBRE"})`);
 
-        /* const [pagos] = await conmysql.query(
+       /*  const [pagos] = await conmysql.query(
             `SELECT * FROM pagos_locales WHERE id_local = ? ORDER BY pago_local_fecha DESC, id_pago_local DESC`,
             [idLocal]
         ); */ // Consulta únicamente los pagos del local asociado
 
-        SELECT pl.*, COALESCE((SELECT SUM(a.pago_ajuste_monto) FROM pagos_ajustes a
-          WHERE a.pago_ajuste_beneficiario='LOCAL' AND a.id_pago=pl.id_pago_local),0) AS pago_local_ajustes
-        FROM pagos_locales pl WHERE pl.id_local = ? ORDER BY pago_local_fecha DESC, id_pago_local DESC,
-            [idLocal]
+        const [pagos] = await conmysql.query(
+            SELECT pl.*, COALESCE((SELECT SUM(a.pago_ajuste_monto) FROM pagos_ajustes a
+              WHERE a.pago_ajuste_beneficiario='LOCAL' AND a.id_pago=pl.id_pago_local),0) AS pago_local_ajustes
+            FROM pagos_locales pl WHERE pl.id_local = ? ORDER BY pago_local_fecha DESC, id_pago_local DESC,
+                [idLocal]
         ); // Consulta únicamente los pagos del local asociado
 
         console.log(`[PagosLocales] Se encontraron ${pagos.length} pagos para el local ${idLocal}`);
