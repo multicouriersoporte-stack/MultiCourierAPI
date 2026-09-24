@@ -9,7 +9,7 @@ const PORCENTAJE_COMISION_LOCAL = 1;
  */
 export const getMisPagosLocales = async (req, res) => {
     try {
-        console.log("[PagosLocales] Usuario autenticado:", req.usuario);
+        //console.log("[PagosLocales] Usuario autenticado:", req.usuario);
         const idUsuario = Number(req.usuario?.id_usuario ?? req.usuario?.usuario_id ?? req.usuario?.idUsuario ?? req.usuario?.id ?? req.usuario?.usuarioId); // Obtiene el ID del usuario autenticado
 
         if (!Number.isInteger(idUsuario) || idUsuario <= 0)
@@ -32,8 +32,14 @@ export const getMisPagosLocales = async (req, res) => {
 
         console.log(`[PagosLocales] Usuario ${idUsuario} pertenece al local ${idLocal} (${local.local_nombre_comercial ?? "SIN NOMBRE"})`);
 
-        const [pagos] = await conmysql.query(
+        /* const [pagos] = await conmysql.query(
             `SELECT * FROM pagos_locales WHERE id_local = ? ORDER BY pago_local_fecha DESC, id_pago_local DESC`,
+            [idLocal]
+        ); */ // Consulta únicamente los pagos del local asociado
+
+        SELECT pl.*, COALESCE((SELECT SUM(a.pago_ajuste_monto) FROM pagos_ajustes a
+          WHERE a.pago_ajuste_beneficiario='LOCAL' AND a.id_pago=pl.id_pago_local),0) AS pago_local_ajustes
+        FROM pagos_locales pl WHERE pl.id_local = ? ORDER BY pago_local_fecha DESC, id_pago_local DESC,
             [idLocal]
         ); // Consulta únicamente los pagos del local asociado
 
@@ -85,9 +91,11 @@ export const crearPagoLocalDesdePedido = async (id_pedido, conexion = conmysql) 
         throw new Error(`El pedido ${idPedido} no tiene un local asociado.`);
     }
 
-    if (Number(pedido.id_estado) !== 15) {
+/*     if (Number(pedido.id_estado) !== 15) {
         throw new Error(`El pago local solo puede generarse cuando el pedido está ENTREGADO (estado 15). Estado actual: ${pedido.id_estado}`);
-    }
+    } */
+    if (String(pedido.estado_nombre || "").trim().toUpperCase() !== "ENTREGADO")
+    throw new Error(`El pago local solo puede generarse cuando el pedido está ENTREGADO. Estado actual: ${pedido.estado_nombre}`);
 
     // Calcular subtotal, comisión y total que recibe el local.
     const subtotal = Number(pedido.pedido_subtotal_local ?? 0);
