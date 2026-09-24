@@ -364,6 +364,7 @@ export default {
 
 
 import { conmysql } from "../db.js";
+import { clasificarMetodoPago, calcularPagoRepartidor as calcularPago } from "../servicios/finanzasCalculos.js";
 
 // CONFIGURACIÓN
 const PORCENTAJE_COMISION_REPARTIDOR = 7.5;
