@@ -59,7 +59,8 @@ const ROLES_ADMIN = ["CENTRAL", "SUPERVISOR", "SOPORTE", "ADMINISTRADOR"];
 const ROLES_MODIFICAR = ["CLIENTE", "LOCAL", "REPARTIDOR", "SOPORTE", "ADMINISTRADOR"];
 
 router.get("/pedidos", verificarToken, permitirRoles(...ROLES_GET), getPedidos);
-router.get("/pedidos/admin", verificarToken, permitirRoles(...ROLES_ADMIN), getPedidos);
+//router.get("/pedidos/admin", verificarToken, permitirRoles(...ROLES_ADMIN), getPedidos);
+router.get("/pedidos/admin", verificarToken, permitirRoles(...ROLES_GET), getPedidos);
 router.get("/pedidos/codigo/:codigo", verificarToken, permitirRoles(...ROLES_GET), getPedidoPorCodigo);
 router.get("/pedidos/estado/:id_estado", verificarToken, permitirRoles(...ROLES_GET), getPedidosPorEstado);
 router.get("/pedidos/cliente/:id_cliente", verificarToken, permitirRoles(...ROLES_ADMIN), getPedidosPorCliente);
