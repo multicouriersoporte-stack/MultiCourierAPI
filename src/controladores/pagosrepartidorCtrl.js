@@ -399,13 +399,14 @@ const tieneRol = (req, rolesPermitidos = []) => {
   return rolesPermitidos.map(r => String(r).trim().toUpperCase()).includes(rol);
 };
 
-// CONSULTAS AUXILIARES
+// CONSULTAS AUXILIARES e.estado_nombre,mp.metodo_pago_nombre,mp.metodo_pago_es_efectivo
 const obtenerPedidoParaPago = async (conexion, id_pedido, bloquear = false) => {
   const lock = bloquear ? " FOR UPDATE" : "";
   const [rows] = await conexion.query(`
-    SELECT p.id_pedido,p.pedido_codigo,p.id_repartidor,p.pedido_carrera,p.pedido_propina,p.pedido_total,p.id_estado,
-           e.estado_nombre,r.repartidor_codigo,r.id_usuario AS repartidor_id_usuario,u.usuario_nombre,u.usuario_apellido,u.usuario_nombre_completo
+    SELECT p.id_pedido,p.pedido_codigo,p.id_repartidor,p.id_metodo_pago,p.pedido_carrera,p.pedido_propina,p.pedido_total,p.id_estado,
+           e.estado_nombre,mp.metodo_pago_nombre,mp.metodo_pago_es_efectivo,r.repartidor_codigo,r.id_usuario AS repartidor_id_usuario,u.usuario_nombre,u.usuario_apellido,u.usuario_nombre_completo
     FROM pedidos p
+    LEFT JOIN metodos_pago mp ON p.id_metodo_pago = mp.id_metodo_pago
     LEFT JOIN estados e ON p.id_estado = e.id_estado
     LEFT JOIN repartidores r ON p.id_repartidor = r.id_repartidor
     LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario
@@ -436,7 +437,7 @@ const calcularPagoRepartidor = (carrera, propina) => {
 };
 
 // CREA EL PAGO AUTOMÁTICO DEL REPARTIDOR AL ENTREGAR EL PEDIDO
-export const crearPagoRepartidorDesdePedido = async (id_pedido, conexionExterna = null) => {
+/* export const crearPagoRepartidorDesdePedido = async (id_pedido, conexionExterna = null) => {
   if (!esIdValido(id_pedido)) throw new Error("El ID del pedido no es válido.");
 
   const idPedido = Number(id_pedido);
@@ -507,7 +508,87 @@ export const crearPagoRepartidorDesdePedido = async (id_pedido, conexionExterna 
   } finally {
     if (!usaConexionExterna) conexion.release();
   }
+}; */
+// CREA EL PAGO AUTOMÁTICO DEL REPARTIDOR AL ENTREGAR EL PEDIDO
+export const crearPagoRepartidorDesdePedido = async (id_pedido, conexionExterna = null) => {
+  if (!esIdValido(id_pedido)) throw new Error("El ID del pedido no es válido.");
+
+  const idPedido = Number(id_pedido), usaConexionExterna = !!conexionExterna;
+  const conexion = conexionExterna || await conmysql.getConnection();
+
+  try {
+    if (!usaConexionExterna) await conexion.beginTransaction();
+
+    // Evita pagos duplicados.
+    const pagoExistente = await obtenerPagoExistente(conexion, idPedido, true);
+    if (pagoExistente) {
+      if (!usaConexionExterna) await conexion.commit();
+      console.log(`[PagosRepartidor] El pedido ${idPedido} ya tiene pago.`);
+      return { creado: false, existente: true, success: true, mensaje: "El pago del repartidor ya existe.", pago: pagoExistente };
+    }
+
+    // Obtiene y valida el pedido.
+    const pedido = await obtenerPedidoParaPago(conexion, idPedido, true);
+    if (!pedido) throw new Error("El pedido no existe.");
+
+    const estadoPedido = String(pedido.estado_nombre || "").trim().toUpperCase();
+    if (estadoPedido !== "ENTREGADO") throw new Error(`El pago del repartidor solo puede generarse cuando el pedido está ENTREGADO. Estado actual: ${estadoPedido || "DESCONOCIDO"}`);
+    if (!pedido.id_repartidor) throw new Error(`El pedido ${idPedido} no tiene un repartidor asignado.`);
+
+    const carrera = Number(pedido.pedido_carrera ?? 0), propina = Number(pedido.pedido_propina ?? 0);
+    if (!Number.isFinite(carrera) || carrera < 0) throw new Error(`El pedido ${idPedido} tiene un pedido_carrera inválido.`);
+    if (!Number.isFinite(propina) || propina < 0) throw new Error(`El pedido ${idPedido} tiene un pedido_propina inválido.`);
+
+    // Clasifica el método y calcula el pago neto del repartidor.
+    const tipoPago = clasificarMetodoPago(pedido);
+    if (!tipoPago) throw new Error("El método de pago del pedido no está clasificado como ONLINE/EFECTIVO.");
+
+    const { porcentajeComision, comision, carreraNeta: carreraRepartidor, propina: propinaRepartidor, total: montoRepartidor } = calcularPago({ carrera, propina, porcentajeComision: PORCENTAJE_COMISION_REPARTIDOR });
+
+    // pago_repartidor_total es GENERATED; MySQL lo calcula automáticamente.
+    const [resultado] = await conexion.query(`
+      INSERT INTO pagos_repartidor (
+        id_pedido,id_repartidor,pago_repartidor_fecha,pago_repartidor_carrera,pago_repartidor_propina,
+        pago_repartidor_otros,pago_repartidor_comision_porcentaje,pago_repartidor_comision,pago_repartidor_estado,
+        id_metodo_pago,pago_repartidor_metodo_tipo
+      ) VALUES (?, ?, CURDATE(), ?, ?, ?, ?, ?, 'PENDIENTE', ?, ?)
+    `, [idPedido, pedido.id_repartidor, carreraRepartidor, propinaRepartidor, 0, porcentajeComision, comision, pedido.id_metodo_pago, tipoPago]);
+
+    // Verifica que el total GENERATED coincida con el cálculo de la aplicación.
+    const [chk] = await conexion.query(`SELECT pago_repartidor_total FROM pagos_repartidor WHERE id_pago_repartidor = ?`, [resultado.insertId]);
+    if (Math.abs(Number(chk[0].pago_repartidor_total) - montoRepartidor) > 0.005) throw new Error(`pago_repartidor_total (${chk[0].pago_repartidor_total}) no coincide con el cálculo esperado (${montoRepartidor}). Revisar la fórmula de la columna generada.`);
+
+    if (!usaConexionExterna) await conexion.commit();
+
+    const [pagoCreado] = await conexion.query(`SELECT * FROM pagos_repartidor WHERE id_pago_repartidor = ? LIMIT 1`, [resultado.insertId]);
+
+    console.log("[PagosRepartidor] Pago creado:", {
+      id_pago_repartidor: resultado.insertId, id_pedido: pedido.id_pedido, id_repartidor: pedido.id_repartidor,
+      carrera, propina, pago_repartidor_carrera: carreraRepartidor, pago_repartidor_propina: propinaRepartidor,
+      pago_repartidor_otros: 0, pago_repartidor_comision_porcentaje: porcentajeComision,
+      pago_repartidor_comision: comision, pago_repartidor_total: montoRepartidor
+    });
+
+    return {
+      creado: true,
+      existente: false,
+      success: true,
+      mensaje: "Pago del repartidor creado correctamente.",
+      pago: pagoCreado[0] || null,
+      calculo: { carrera, propina, porcentaje_comision: porcentajeComision, comision, carrera_repartidor: carreraRepartidor, propina_repartidor: propinaRepartidor, monto_repartidor: montoRepartidor }
+    };
+  } catch (error) {
+    if (!usaConexionExterna) {
+      try { await conexion.rollback(); }
+      catch (rollbackError) { console.error("[PagosRepartidor] Error rollback:", rollbackError); }
+    }
+    console.error("[PagosRepartidor] Error crearPagoRepartidorDesdePedido:", error);
+    throw error;
+  } finally {
+    if (!usaConexionExterna) conexion.release();
+  }
 };
+
 
 // CREA UN PAGO MANUALMENTE: SOLO SOPORTE Y ADMINISTRADOR
 export const postPagoRepartidor = async (req, res) => {
