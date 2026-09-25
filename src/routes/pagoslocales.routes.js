@@ -8,7 +8,9 @@ import {
     getPagosLocalesPorPedido,
     putPagosLocales,
     patchPagosLocales,
-    deletePagosLocales
+    deletePagosLocales,
+    getDetallePagoLocal,
+    confirmarPagoLocal
 } from "../controladores/pagoslocalesCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
@@ -16,6 +18,9 @@ import { permitirRoles } from "../middlewares/roles.middleware.js";
 const router = Router();
 
 router.get("/pagoslocales/mis-pagos", verificarToken, permitirRoles("LOCAL"), getMisPagosLocales);
+
+router.get("/pagoslocales/local/:id_local/detalle", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL", "SOPORTE"), getDetallePagoLocal);
+router.patch("/pagoslocales/local/:id_local/confirmar", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL", "SOPORTE"), confirmarPagoLocal);
 
 // Consultas: LOCAL, ADMINISTRADOR y CENTRAL.
 router.get("/pagoslocales", verificarToken, permitirRoles("LOCAL", "ADMINISTRADOR", "CENTRAL"), getPagosLocales);
