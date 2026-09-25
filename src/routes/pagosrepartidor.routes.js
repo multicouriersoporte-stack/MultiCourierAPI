@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  getPagosPorRepartidor,
   postPagoRepartidor,
   getPagoRepartidorPorPedido,
   getMisPagosRepartidor,
@@ -11,6 +12,9 @@ import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
 
 const router = Router();
+
+router.get("/pagosrepartidores/repartidor/:id_repartidor", verificarToken,
+  permitirRoles("SOPORTE", "ADMINISTRADOR", "CENTRAL", "SUPERVISOR"), getPagosPorRepartidor);
 
 // Listar todos (administrativo)
 router.get("/pagosrepartidores", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR", "CENTRAL", "SUPERVISOR"), getPagosRepartidores);
