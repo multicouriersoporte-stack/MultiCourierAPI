@@ -3,47 +3,21 @@ import { conmysql } from "../db.js";
 // Comisión que se descuenta al local.
 const PORCENTAJE_COMISION_LOCAL = 1;
 
+const obtenerRolLocal = req => {
+    const u = req.usuario || {};
+    const rol = u.usuario_rol ?? u.rol_usuario ?? u.usuarioRol ?? u.rol ?? u.role ?? u.rol_nombre;
+    return String(rol || "").trim().toUpperCase();
+};
+const esAdministrativoPagos = req => ["SOPORTE", "ADMINISTRADOR", "CENTRAL"].includes(obtenerRolLocal(req));
+const obtenerIdUsuarioAuth = req => {
+    const u = req.usuario || {};
+    return u.id_usuario ?? u.usuario_id ?? u.idUsuario ?? u.id ?? u.usuarioId ?? null;
+};
+
 /**
  * Obtiene únicamente los pagos del local del usuario autenticado.
  * El id_local se obtiene mediante verificarToken.
  */
-/* export const getMisPagosLocales = async (req, res) => {
-    try {
-        //console.log("[PagosLocales] Usuario autenticado:", req.usuario);
-        const idUsuario = Number(req.usuario?.id_usuario ?? req.usuario?.usuario_id ?? req.usuario?.idUsuario ?? req.usuario?.id ?? req.usuario?.usuarioId); // Obtiene el ID del usuario autenticado
-
-        if (!Number.isInteger(idUsuario) || idUsuario <= 0)
-            return res.status(403).json({ success: false, message: "No se pudo identificar al usuario autenticado." });
-
-        console.log(`[PagosLocales] Buscando local asociado al usuario ${idUsuario}`);
-        const [locales] = await conmysql.query(
-            `SELECT id_local, id_usuario, local_codigo, local_nombre_comercial, local_razon_social FROM locales WHERE id_usuario = ? LIMIT 1`,
-            [idUsuario]
-        ); // Obtiene el local asociado desde la tabla locales
-
-        if (locales.length === 0)
-            return res.status(403).json({ success: false, message: "El usuario autenticado no tiene un local asociado." });
-
-        const local = locales[0];
-        const idLocal = Number(local.id_local);
-
-        if (!Number.isInteger(idLocal) || idLocal <= 0)
-            return res.status(403).json({ success: false, message: "El local asociado al usuario no es válido." });
-
-        console.log(`[PagosLocales] Usuario ${idUsuario} pertenece al local ${idLocal} (${local.local_nombre_comercial ?? "SIN NOMBRE"})`);
-
-        const [pagos] = await conmysql.query(
-            `SELECT * FROM pagos_locales WHERE id_local = ? ORDER BY pago_local_fecha DESC, id_pago_local DESC`,
-            [idLocal]
-        ); // Consulta únicamente los pagos del local asociado
-
-        console.log(`[PagosLocales] Se encontraron ${pagos.length} pagos para el local ${idLocal}`);
-        return res.json(pagos);
-    } catch (error) {
-        console.error("[PagosLocales] Error getMisPagosLocales:", error);
-        return res.status(500).json({ success: false, message: "Error al consultar los pagos del local", error: error.message });
-    }
-}; */
 export const getMisPagosLocales = async (req, res) => {
     try {
         const idUsuario = Number(req.usuario?.id_usuario ?? req.usuario?.usuario_id ?? req.usuario?.idUsuario ?? req.usuario?.id ?? req.usuario?.usuarioId);
@@ -114,11 +88,11 @@ export const crearPagoLocalDesdePedido = async (id_pedido, conexion = conmysql) 
         throw new Error(`El pedido ${idPedido} no tiene un local asociado.`);
     }
 
-/*     if (Number(pedido.id_estado) !== 15) {
-        throw new Error(`El pago local solo puede generarse cuando el pedido está ENTREGADO (estado 15). Estado actual: ${pedido.id_estado}`);
-    } */
+    /*     if (Number(pedido.id_estado) !== 15) {
+            throw new Error(`El pago local solo puede generarse cuando el pedido está ENTREGADO (estado 15). Estado actual: ${pedido.id_estado}`);
+        } */
     if (String(pedido.estado_nombre || "").trim().toUpperCase() !== "ENTREGADO")
-    throw new Error(`El pago local solo puede generarse cuando el pedido está ENTREGADO. Estado actual: ${pedido.estado_nombre}`);
+        throw new Error(`El pago local solo puede generarse cuando el pedido está ENTREGADO. Estado actual: ${pedido.estado_nombre}`);
 
     // Calcular subtotal, comisión y total que recibe el local.
     const subtotal = Number(pedido.pedido_subtotal_local ?? 0);
@@ -237,6 +211,49 @@ export const getPagosLocalesPorPedido = async (req, res) => {
     }
 };
 
+
+/**
+ * Detalle de pago de un local: pedidos con pago, total pendiente acumulado.
+ * GET /pagoslocales/local/:id_local/detalle
+ */
+export const getDetallePagoLocal = async (req, res) => {
+    try {
+        if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
+        if (!esAdministrativoPagos(req)) return res.status(403).json({ success: false, message: "No tienes permisos para consultar pagos de locales." });
+
+        const id_local = Number(req.params.id_local);
+        if (!Number.isInteger(id_local) || id_local <= 0) return res.status(400).json({ success: false, message: "El ID del local no es válido." });
+
+        const [locales] = await conmysql.query(
+            `SELECT id_local, local_nombre_comercial, local_razon_social, local_codigo FROM locales WHERE id_local = ? LIMIT 1`,
+            [id_local]
+        );
+        if (!locales.length) return res.status(404).json({ success: false, message: "Local no encontrado." });
+
+        const [pagos] = await conmysql.query(`
+      SELECT pl.*, p.pedido_codigo, p.pedido_fecha, p.pedido_fecha_entrega
+      FROM pagos_locales pl
+      INNER JOIN pedidos p ON pl.id_pedido = p.id_pedido
+      WHERE pl.id_local = ?
+      ORDER BY (pl.pago_local_estado = 'PENDIENTE') DESC, pl.pago_local_fecha DESC
+    `, [id_local]);
+
+        const pendientes = pagos.filter(p => String(p.pago_local_estado).toUpperCase() === "PENDIENTE");
+        const totalPendiente = pendientes.reduce((acc, p) => acc + Number(p.pago_local_total || 0), 0);
+
+        return res.json({
+            success: true,
+            local: locales[0],
+            total_pendiente: Number(totalPendiente.toFixed(2)),
+            cantidad_pedidos_pendientes: pendientes.length,
+            pagos
+        });
+    } catch (error) {
+        console.error("[PagosLocales] Error getDetallePagoLocal:", error);
+        return res.status(500).json({ success: false, message: "Error al consultar el detalle de pago del local.", error: error.message });
+    }
+};
+
 /** Crear un pago local manualmente. */
 export const postPagosLocales = async (req, res) => {
     try {
@@ -266,6 +283,61 @@ export const postPagosLocales = async (req, res) => {
     } catch (error) {
         console.error("Error postPagosLocales:", error);
         return res.status(500).json({ message: "Error al registrar pago local", error: error.message });
+    }
+};
+
+
+/**
+ * Confirma TODOS los pagos PENDIENTE de un local en una sola operación (todo o nada).
+ * PATCH /pagoslocales/local/:id_local/confirmar
+ */
+export const confirmarPagoLocal = async (req, res) => {
+    const conexion = await conmysql.getConnection();
+    try {
+        if (!req.usuario) { conexion.release(); return res.status(401).json({ success: false, message: "Usuario no autenticado." }); }
+        if (!esAdministrativoPagos(req)) { conexion.release(); return res.status(403).json({ success: false, message: "No tienes permisos para confirmar pagos de locales." }); }
+
+        const id_local = Number(req.params.id_local);
+        if (!Number.isInteger(id_local) || id_local <= 0) { conexion.release(); return res.status(400).json({ success: false, message: "El ID del local no es válido." }); }
+
+        const idUsuario = obtenerIdUsuarioAuth(req);
+        await conexion.beginTransaction();
+
+        const [pendientes] = await conexion.query(
+            `SELECT id_pago_local, pago_local_total FROM pagos_locales WHERE id_local = ? AND pago_local_estado = 'PENDIENTE' FOR UPDATE`,
+            [id_local]
+        );
+
+        if (!pendientes.length) {
+            await conexion.rollback();
+            return res.status(409).json({ success: false, message: "El local no tiene pagos pendientes de confirmación.", codigo: "SIN_PAGOS_PENDIENTES" });
+        }
+
+        const ids = pendientes.map(p => p.id_pago_local);
+        const totalConfirmado = pendientes.reduce((acc, p) => acc + Number(p.pago_local_total || 0), 0);
+
+        await conexion.query(
+            `UPDATE pagos_locales SET pago_local_estado='PAGADO', pago_local_confirmado_por=?, pago_local_confirmado_fecha=NOW() WHERE id_pago_local IN (?)`,
+            [idUsuario, ids]
+        );
+
+        await conexion.commit();
+
+        return res.json({
+            success: true,
+            message: "Pago del local confirmado correctamente.",
+            id_local,
+            pagos_confirmados: ids.length,
+            total_confirmado: Number(totalConfirmado.toFixed(2)),
+            confirmado_por: idUsuario,
+            confirmado_fecha: new Date()
+        });
+    } catch (error) {
+        try { await conexion.rollback(); } catch (_) { }
+        console.error("[PagosLocales] Error confirmarPagoLocal:", error);
+        return res.status(500).json({ success: false, message: "Error al confirmar el pago del local.", error: error.message });
+    } finally {
+        conexion.release();
     }
 };
 
