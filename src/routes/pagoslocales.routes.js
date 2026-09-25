@@ -9,7 +9,6 @@ import {
     putPagosLocales,
     patchPagosLocales,
     deletePagosLocales,
-    getDetallePagoLocal,
     confirmarPagoLocal
 } from "../controladores/pagoslocalesCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
@@ -18,9 +17,6 @@ import { permitirRoles } from "../middlewares/roles.middleware.js";
 const router = Router();
 
 router.get("/pagoslocales/mis-pagos", verificarToken, permitirRoles("LOCAL"), getMisPagosLocales);
-
-router.get("/pagoslocales/local/:id_local/detalle", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL", "SOPORTE"), getDetallePagoLocal);
-router.patch("/pagoslocales/local/:id_local/confirmar", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL", "SOPORTE"), confirmarPagoLocal);
 
 // Consultas: LOCAL, ADMINISTRADOR y CENTRAL.
 router.get("/pagoslocales", verificarToken, permitirRoles("LOCAL", "ADMINISTRADOR", "CENTRAL"), getPagosLocales);
@@ -31,6 +27,8 @@ router.get("/pagoslocales/pedido/:id_pedido", verificarToken, permitirRoles("LOC
 // Administración: ADMINISTRADOR y CENTRAL.
 router.put("/pagoslocales/:id", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), putPagosLocales);
 router.patch("/pagoslocales/:id", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), patchPagosLocales);
+
+router.patch("/pagoslocales/:id/confirmar", verificarToken, permitirRoles("ADMINISTRADOR", "CENTRAL"), confirmarPagoLocal);
 
 // Eliminación: solamente ADMINISTRADOR.
 router.delete("/pagoslocales/:id", verificarToken, permitirRoles("ADMINISTRADOR"), deletePagosLocales);
