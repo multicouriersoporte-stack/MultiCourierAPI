@@ -147,109 +147,6 @@ export const crearPagoRepartidorDesdePedido = async (id_pedido, conexionExterna 
   }
 };
 
-
-/**
- * Detalle de ganancias de un repartidor: pedidos con pago, total pendiente.
- * GET /pagosrepartidores/repartidor/:id_repartidor/detalle
- */
-export const getDetalleGananciasRepartidor = async (req, res) => {
-  try {
-    if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
-    if (!tieneRol(req, ["SOPORTE", "ADMINISTRADOR", "CENTRAL", "SUPERVISOR"])) return res.status(403).json({ success: false, message: "No tienes permisos para consultar pagos de repartidores." });
-
-    const id_repartidor = Number(req.params.id_repartidor);
-    if (!esIdValido(id_repartidor)) return res.status(400).json({ success: false, message: "El ID del repartidor no es válido." });
-
-    const [repartidores] = await conmysql.query(`
-      SELECT r.id_repartidor, r.repartidor_codigo, r.repartidor_balance_efectivo, u.usuario_nombre_completo
-      FROM repartidores r LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario
-      WHERE r.id_repartidor = ? LIMIT 1
-    `, [id_repartidor]);
-    if (!repartidores.length) return res.status(404).json({ success: false, message: "Repartidor no encontrado." });
-
-    const [pagos] = await conmysql.query(`
-      SELECT pr.*, p.pedido_codigo, p.pedido_fecha, p.pedido_fecha_entrega,
-             ${CAMPOS_PAGO_EXTRA}
-      FROM pagos_repartidor pr
-      INNER JOIN pedidos p ON pr.id_pedido = p.id_pedido
-      ${JOIN_METODO_PAGO}
-      WHERE pr.id_repartidor = ?
-      ORDER BY (pr.pago_repartidor_estado = 'PENDIENTE') DESC, pr.pago_repartidor_fecha DESC
-    `, [id_repartidor]);
-
-    const pendientes = pagos.filter(p => String(p.pago_repartidor_estado).toUpperCase() === "PENDIENTE");
-    const totalPendiente = pendientes.reduce((acc, p) => acc + Number(p.pago_repartidor_total || 0), 0);
-
-    return res.json({
-      success: true,
-      repartidor: repartidores[0],
-      // balance_efectivo se incluye solo como referencia; esta ruta NO lo modifica.
-      total_pendiente: Number(totalPendiente.toFixed(2)),
-      cantidad_pedidos_pendientes: pendientes.length,
-      pagos
-    });
-  } catch (error) {
-    console.error("[PagosRepartidor] Error getDetalleGananciasRepartidor:", error);
-    return res.status(500).json({ success: false, message: "Error al consultar ganancias del repartidor.", error: error.message });
-  }
-};
-
-
-/**
- * Confirma TODAS las ganancias PENDIENTE de un repartidor (todo o nada).
- * No toca repartidor_balance_efectivo bajo ninguna circunstancia.
- * PATCH /pagosrepartidores/repartidor/:id_repartidor/confirmar
- */
-export const confirmarPagoRepartidor = async (req, res) => {
-  const conexion = await conmysql.getConnection();
-  try {
-    if (!req.usuario) { conexion.release(); return res.status(401).json({ success: false, message: "Usuario no autenticado." }); }
-    if (!tieneRol(req, ["SOPORTE", "ADMINISTRADOR"])) { conexion.release(); return res.status(403).json({ success: false, message: "No tienes permisos para confirmar pagos de repartidores." }); }
-
-    const id_repartidor = Number(req.params.id_repartidor);
-    if (!esIdValido(id_repartidor)) { conexion.release(); return res.status(400).json({ success: false, message: "El ID del repartidor no es válido." }); }
-
-    const idUsuario = obtenerIdUsuario(req);
-    await conexion.beginTransaction();
-
-    const [pendientes] = await conexion.query(
-      `SELECT id_pago_repartidor, pago_repartidor_total FROM pagos_repartidor WHERE id_repartidor = ? AND pago_repartidor_estado = 'PENDIENTE' FOR UPDATE`,
-      [id_repartidor]
-    );
-
-    if (!pendientes.length) {
-      await conexion.rollback();
-      return res.status(409).json({ success: false, message: "El repartidor no tiene ganancias pendientes de confirmación.", codigo: "SIN_PAGOS_PENDIENTES" });
-    }
-
-    const ids = pendientes.map(p => p.id_pago_repartidor);
-    const totalConfirmado = pendientes.reduce((acc, p) => acc + Number(p.pago_repartidor_total || 0), 0);
-
-    await conexion.query(
-      `UPDATE pagos_repartidor SET pago_repartidor_estado='PAGADO', pago_repartidor_confirmado_por=?, pago_repartidor_confirmado_fecha=NOW() WHERE id_pago_repartidor IN (?)`,
-      [idUsuario, ids]
-    );
-
-    await conexion.commit();
-
-    return res.json({
-      success: true,
-      message: "Pago del repartidor confirmado correctamente.",
-      id_repartidor,
-      pagos_confirmados: ids.length,
-      total_confirmado: Number(totalConfirmado.toFixed(2)),
-      confirmado_por: idUsuario,
-      confirmado_fecha: new Date()
-    });
-  } catch (error) {
-    try { await conexion.rollback(); } catch (_) { }
-    console.error("[PagosRepartidor] Error confirmarPagoRepartidor:", error);
-    return res.status(500).json({ success: false, message: "Error al confirmar el pago del repartidor.", error: error.message });
-  } finally {
-    conexion.release();
-  }
-};
-
 // CREA UN PAGO MANUALMENTE: SOLO SOPORTE Y ADMINISTRADOR
 // Pasa por el servicio financiero para que, si el pedido fue en efectivo, el cobro también quede en Balance.
 // (import dinámico: finanzasService importa este archivo; así se evita el ciclo de módulos)
@@ -271,6 +168,52 @@ export const postPagoRepartidor = async (req, res) => {
   } catch (error) {
     console.error("[PagosRepartidor] Error postPagoRepartidor:", error);
     return res.status(error.status || 500).json({ success: false, message: error.message || "Error al crear el pago del repartidor.", codigo: error.codigo });
+  }
+};
+
+// CONFIRMA EL PAGO DE GANANCIAS AL REPARTIDOR (Pago Pendiente -> Pagado). No toca el balance/deuda de efectivo.
+export const confirmarPagoRepartidor = async (req, res) => {
+  const conexion = await conmysql.getConnection();
+  try {
+    if (!req.usuario) { conexion.release(); return res.status(401).json({ success: false, message: "Usuario no autenticado." }); }
+    if (!tieneRol(req, ["SOPORTE", "ADMINISTRADOR"])) { conexion.release(); return res.status(403).json({ success: false, message: "No tienes permisos para confirmar pagos a repartidores." }); }
+
+    const { id } = req.params;
+    if (!esIdValido(id)) { conexion.release(); return res.status(400).json({ success: false, message: "El ID del pago no es válido." }); }
+
+    const idUsuario = Number(obtenerIdUsuario(req)) || null;
+
+    await conexion.beginTransaction();
+
+    const [rows] = await conexion.query(`SELECT * FROM pagos_repartidor WHERE id_pago_repartidor = ? LIMIT 1 FOR UPDATE`, [id]);
+    if (!rows.length) { await conexion.rollback(); return res.status(404).json({ success: false, message: "Pago no encontrado." }); }
+
+    const pago = rows[0];
+    const estadoActual = String(pago.pago_repartidor_estado || "").trim().toUpperCase();
+
+    if (estadoActual === "PAGADO") {
+      await conexion.rollback();
+      return res.status(409).json({ success: false, codigo: "PAGO_YA_CONFIRMADO", message: "Este pago ya fue confirmado anteriormente.", pago });
+    }
+    if (estadoActual === "CANCELADO") {
+      await conexion.rollback();
+      return res.status(409).json({ success: false, codigo: "PAGO_CANCELADO", message: "No se puede confirmar un pago que fue cancelado." });
+    }
+
+    await conexion.query(
+      `UPDATE pagos_repartidor SET pago_repartidor_estado='PAGADO', pago_repartidor_confirmado_por=?, pago_repartidor_confirmado_fecha=NOW() WHERE id_pago_repartidor=?`,
+      [idUsuario, id]
+    );
+    await conexion.commit();
+
+    const [actualizado] = await conmysql.query(`SELECT * FROM pagos_repartidor WHERE id_pago_repartidor = ? LIMIT 1`, [id]);
+    return res.json({ success: true, message: "Pago al repartidor confirmado correctamente.", pago: actualizado[0] });
+  } catch (error) {
+    try { await conexion.rollback(); } catch (_) { }
+    console.error("[PagosRepartidor] Error confirmarPagoRepartidor:", error);
+    return res.status(500).json({ success: false, message: "Error al confirmar el pago del repartidor.", error: error.message });
+  } finally {
+    conexion.release();
   }
 };
 
