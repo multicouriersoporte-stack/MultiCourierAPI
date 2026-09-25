@@ -165,15 +165,20 @@ export const getPagosLocalesPorLocal = async (req, res) => {
     try {
         const { id_local } = req.params;
         const [result] = await conmysql.query(
-            `SELECT * FROM pagos_locales WHERE id_local = ? ORDER BY id_pago_local DESC`,
+            `SELECT pl.*, p.pedido_codigo, p.pedido_fecha_entrega,
+                    COALESCE((SELECT SUM(a.pago_ajuste_monto) FROM pagos_ajustes a
+                              WHERE a.pago_ajuste_beneficiario = 'LOCAL' AND a.id_pago = pl.id_pago_local), 0) AS pago_local_ajustes
+             FROM pagos_locales pl
+             LEFT JOIN pedidos p ON pl.id_pedido = p.id_pedido
+             WHERE pl.id_local = ?
+             ORDER BY pl.pago_local_fecha DESC, pl.id_pago_local DESC`,
             [id_local]
         );
+        const totalPendiente = result
+            .filter(p => String(p.pago_local_estado).trim().toUpperCase() === 'PENDIENTE')
+            .reduce((sum, p) => sum + Number(p.pago_local_total || 0), 0);
 
-        if (result.length === 0) {
-            return res.status(404).json({ message: "No existen pagos asociados a este local" });
-        }
-
-        res.json(result);
+        return res.json({ success: true, total_pendiente: Number(totalPendiente.toFixed(2)), pagos: result });
     } catch (error) {
         console.error("Error getPagosLocalesPorLocal:", error);
         return res.status(500).json({ message: "Error del servidor", error: error.message });
