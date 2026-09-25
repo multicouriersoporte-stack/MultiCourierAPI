@@ -66,6 +66,47 @@ const obtenerPagoExistente = async (conexion, id_pedido, bloquear = false) => {
   return rows.length ? rows[0] : null;
 };
 
+// LISTA LOS PAGOS DE UN REPARTIDOR ESPECÍFICO (vista admin)
+export const getPagosPorRepartidor = async (req, res) => {
+  try {
+    if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
+    if (!tieneRol(req, ["SOPORTE", "ADMINISTRADOR", "CENTRAL", "SUPERVISOR"])) {
+      return res.status(403).json({ success: false, message: "No tienes permisos para consultar pagos de este repartidor." });
+    }
+
+    const { id_repartidor } = req.params;
+    if (!esIdValido(id_repartidor)) return res.status(400).json({ success: false, message: "El ID del repartidor no es válido." });
+
+    const [repartidores] = await conmysql.query(
+      `SELECT r.id_repartidor,r.repartidor_codigo,u.usuario_nombre_completo,u.usuario_telefono
+       FROM repartidores r LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario WHERE r.id_repartidor = ? LIMIT 1`,
+      [id_repartidor]
+    );
+    if (!repartidores.length) return res.status(404).json({ success: false, message: "El repartidor no existe." });
+
+    const [pagos] = await conmysql.query(`
+      SELECT pr.*,p.pedido_codigo,p.pedido_fecha,p.pedido_fecha_entrega,p.pedido_carrera,p.pedido_propina,
+             l.local_nombre_comercial,
+             ${CAMPOS_PAGO_EXTRA}
+      FROM pagos_repartidor pr
+      INNER JOIN pedidos p ON pr.id_pedido = p.id_pedido
+      ${JOIN_METODO_PAGO}
+      LEFT JOIN locales l ON p.id_local = l.id_local
+      WHERE pr.id_repartidor = ?
+      ORDER BY pr.id_pago_repartidor DESC
+    `, [id_repartidor]);
+
+    const totalPendiente = pagos
+      .filter(p => String(p.pago_repartidor_estado).trim().toUpperCase() === "PENDIENTE")
+      .reduce((sum, p) => sum + Number(p.pago_repartidor_total || 0), 0);
+
+    return res.json({ success: true, repartidor: repartidores[0], total_pendiente: Number(totalPendiente.toFixed(2)), pagos });
+  } catch (error) {
+    console.error("[PagosRepartidor] Error getPagosPorRepartidor:", error);
+    return res.status(500).json({ success: false, message: "Error al consultar los pagos del repartidor.", error: error.message });
+  }
+};
+
 // CREA EL PAGO AUTOMÁTICO DEL REPARTIDOR AL ENTREGAR EL PEDIDO
 export const crearPagoRepartidorDesdePedido = async (id_pedido, conexionExterna = null) => {
   if (!esIdValido(id_pedido)) throw new Error("El ID del pedido no es válido.");
