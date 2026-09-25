@@ -47,3 +47,41 @@ export const postRecalcularPago = async (req, res) => {
         return res.json({ success: true, ...resultado });
     } catch (e) { return error(res, e); }
 };
+
+// GET /balance/repartidor/:id_repartidor — resumen (uso admin/soporte)
+export const getBalanceRepartidorAdmin = async (req, res) => {
+    try {
+        if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
+        const id_repartidor = Number(req.params.id_repartidor);
+        if (!Number.isInteger(id_repartidor) || id_repartidor <= 0) return res.status(400).json({ success: false, message: "El ID del repartidor no es válido." });
+        const resumen = await balanceService.obtenerResumen(id_repartidor);
+        return res.json({ success: true, balance: resumen });
+    } catch (e) { return error(res, e); }
+};
+
+// GET /balance/repartidor/:id_repartidor/transacciones
+export const getTransaccionesRepartidorAdmin = async (req, res) => {
+    try {
+        if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
+        const id_repartidor = Number(req.params.id_repartidor);
+        if (!Number.isInteger(id_repartidor) || id_repartidor <= 0) return res.status(400).json({ success: false, message: "El ID del repartidor no es válido." });
+        const limite = Number(req.query.limite || 50), offset = Number(req.query.offset || 0);
+        const transacciones = await balanceService.listarTransaccionesBalance(id_repartidor, { limite, offset });
+        return res.json({ success: true, id_repartidor, total: transacciones.length, transacciones });
+    } catch (e) { return error(res, e); }
+};
+
+// POST /balance/repartidor/:id_repartidor/pagar — admin registra que el repartidor entregó efectivo
+export const postRegistrarPagoBalance = async (req, res) => {
+    try {
+        if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
+        const id_repartidor = Number(req.params.id_repartidor);
+        if (!Number.isInteger(id_repartidor) || id_repartidor <= 0) return res.status(400).json({ success: false, message: "El ID del repartidor no es válido." });
+
+        const { monto, observacion } = req.body || {};
+        const id_usuario_registro = obtenerIdUsuario(req);
+
+        const resultado = await balanceService.registrarPagoBalanceAdmin(id_repartidor, monto, { observacion, id_usuario_registro });
+        return res.status(201).json({ success: true, message: "Pago de balance registrado correctamente.", ...resultado });
+    } catch (e) { return error(res, e); }
+};
