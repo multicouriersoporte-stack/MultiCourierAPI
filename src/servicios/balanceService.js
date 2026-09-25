@@ -67,7 +67,7 @@ export async function depositarEfectivo(id_repartidor, monto) {
             balance: { saldo: nuevoSaldo, limite: Number(billetera.billetera_limite), excede_limite: nuevoSaldo > Number(billetera.billetera_limite), efectivo_habilitado: habilitado }
         };
     } catch (error) {
-        try { await conexion.rollback(); } catch (_) {}
+        try { await conexion.rollback(); } catch (_) { }
         throw error;
     } finally { conexion.release(); }
 }
@@ -97,7 +97,49 @@ export async function sincronizarPagoExistente(id_pedido) {
         await conexion.commit();
         return { sincronizado: true, movimientos: movimientos || [] };
     } catch (error) {
-        try { await conexion.rollback(); } catch (_) {}
+        try { await conexion.rollback(); } catch (_) { }
+        throw error;
+    } finally { conexion.release(); }
+}
+
+// Admin registra que el repartidor entregó efectivo (reduce la deuda). No otorga puntos (eso es solo autodepósito).
+export async function registrarPagoBalanceAdmin(id_repartidor, monto, { observacion = null, id_usuario_registro = null } = {}) {
+    const montoPagado = Number(monto);
+    if (!Number.isFinite(montoPagado) || montoPagado <= 0)
+        throw Object.assign(new Error("El monto registrado debe ser mayor a cero."), { status: 400 });
+
+    const conexion = await conmysql.getConnection();
+    try {
+        await conexion.beginTransaction();
+        const billetera = await billeteraService.obtenerOAsegurarBilletera(conexion, id_repartidor, true);
+        if (!billetera) throw Object.assign(new Error("No se encontró la billetera del repartidor."), { status: 404 });
+
+        const saldo = Number(billetera.billetera_saldo);
+        if (saldo <= 0) throw Object.assign(new Error(`El repartidor no tiene balance pendiente. Saldo actual: ${saldo.toFixed(2)} US$.`), { status: 400 });
+        if (montoPagado > saldo) throw Object.assign(new Error(`El monto (${montoPagado.toFixed(2)} US$) excede el balance pendiente (${saldo.toFixed(2)} US$).`), { status: 400 });
+
+        const nuevoSaldo = saldo - montoPagado;
+        const conceptoTexto = `Pago de balance registrado por administrador${observacion ? `: ${observacion}` : ""}`;
+
+        const movimiento = await billeteraService.insertarMovimiento(conexion, {
+            id_billetera: billetera.id_billetera, id_repartidor, tipo: "DEPOSITO", monto: -montoPagado,
+            saldoAnterior: saldo, saldoNuevo: nuevoSaldo, concepto: conceptoTexto,
+            referencia: `PAGO_BALANCE_ADMIN-${id_usuario_registro ?? "SN"}-${Date.now()}`
+        });
+
+        await billeteraService.actualizarSaldo(conexion, billetera.id_billetera, nuevoSaldo);
+        const habilitado = nuevoSaldo <= Number(billetera.billetera_limite || 25);
+        await billeteraService.actualizarHabilitacionEfectivo(conexion, billetera.id_billetera, habilitado);
+
+        await conexion.commit();
+        const [transaccion] = await conexion.query(`SELECT * FROM billetera_transacciones WHERE id_transaccion = ? LIMIT 1`, [movimiento.id_transaccion]);
+
+        return {
+            transaccion: transaccion[0] || null,
+            balance: { saldo: nuevoSaldo, limite: Number(billetera.billetera_limite), excede_limite: nuevoSaldo > Number(billetera.billetera_limite), efectivo_habilitado: habilitado }
+        };
+    } catch (error) {
+        try { await conexion.rollback(); } catch (_) { }
         throw error;
     } finally { conexion.release(); }
 }
