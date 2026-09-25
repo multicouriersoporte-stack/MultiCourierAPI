@@ -4,7 +4,8 @@ import {
   getPagoRepartidorPorPedido,
   getMisPagosRepartidor,
   actualizarEstadoPagoRepartidor,
-  getPagosRepartidores
+  getPagosRepartidores,
+  confirmarPagoRepartidor
 } from "../controladores/pagosrepartidorCtrl.js";
 import { verificarToken } from "../middlewares/auth.middleware.js";
 import { permitirRoles } from "../middlewares/roles.middleware.js";
@@ -25,5 +26,7 @@ router.post("/pagosrepartidores/pedido/:id_pedido", verificarToken, permitirRole
 
 // Actualizar estado
 router.patch("/pagosrepartidores/:id/estado", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), actualizarEstadoPagoRepartidor);
+
+router.patch("/pagosrepartidores/:id/confirmar", verificarToken, permitirRoles("SOPORTE", "ADMINISTRADOR"), confirmarPagoRepartidor);
 
 export default router;
