@@ -338,27 +338,7 @@ const normalizarData = (datos = {}) => {
 // Construye el mensaje común para Android e iOS. Canal único "orders" de
 // alta prioridad (decisión tomada en el prompt, sección "Decisiones que
 // puedes tomar sin preguntar").
-/* const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => ({
-    ...(token && { token }),
-    notification: { title: String(titulo), body: String(mensaje) },
-    data,
-    android: {
-        priority: "high",
-        notification: {
-            channelId: CANAL_NOTIFICACIONES,
-            sound: sonido,
-            icon: "ic_launcher",
-            defaultVibrateTimings: true,
-            priority: "max",
-            visibility: "public",
-        },
-    },
-    apns: {
-        headers: { "apns-priority": "10" },
-        payload: { aps: { sound: sonido, badge: 1 } },
-    },
-}); */
-const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => {
+/* const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => {
     const idPedido = data?.orderId || data?.pedido_id || null;
 
     return {
@@ -383,6 +363,36 @@ const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => {
                 ...(idPedido && { "apns-collapse-id": `pedido_${idPedido}` }), // equivalente iOS
             },
             payload: { aps: { sound: sonido, badge: 1, "thread-id": idPedido ? `pedido_${idPedido}` : undefined } },
+        },
+    };
+}; */
+const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => {
+    const idPedido = data?.orderId || data?.pedido_id || null;
+    const sonidoAndroid = sonido; // ej: "pedido_actualizado" (sin extensión, busca en res/raw)
+    const sonidoIOS = `${sonido}.caf`; // ej: "pedido_actualizado.caf"
+
+    return {
+        ...(token && { token }),
+        notification: { title: String(titulo), body: String(mensaje) },
+        data,
+        android: {
+            priority: "high",
+            notification: {
+                channelId: CANAL_NOTIFICACIONES,
+                sound: sonidoAndroid,
+                icon: "ic_launcher",
+                defaultVibrateTimings: true,
+                priority: "max",
+                visibility: "public",
+                ...(idPedido && { tag: `pedido_${idPedido}` }),
+            },
+        },
+        apns: {
+            headers: {
+                "apns-priority": "10",
+                ...(idPedido && { "apns-collapse-id": `pedido_${idPedido}` }),
+            },
+            payload: { aps: { sound: sonidoIOS, badge: 1, "thread-id": idPedido ? `pedido_${idPedido}` : undefined } },
         },
     };
 };
