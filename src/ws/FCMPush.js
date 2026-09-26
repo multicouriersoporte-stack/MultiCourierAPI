@@ -237,6 +237,7 @@ export const enviarPush = async (token, { titulo = "MultiCourier", mensaje = "",
         const messaging = getFCMMessaging();
         const data = normalizarData(datos);
         const message = crearMensaje({ titulo, mensaje, data, sonido, token });
+        console.log('📦 Payload FCM completo:', JSON.stringify(message, null, 2));
         const messageId = await messaging.send(message);
 
         console.log("📲 Push enviado correctamente:", {
