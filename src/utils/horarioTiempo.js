@@ -1,5 +1,5 @@
 // Ecuador continental (Guayaquil, Quito) es siempre UTC-5, sin horario de verano.
-const OFFSET_ECUADOR_HORAS = 5;
+export const OFFSET_ECUADOR_HORAS = 5;
 
 function partesFecha(horarioFecha) {
     return typeof horarioFecha === "string"
