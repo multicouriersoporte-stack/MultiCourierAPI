@@ -284,7 +284,8 @@ export async function soltarHoras(idReserva, idRepartidor) {
 
 
 import { conmysql } from "../db.js";
-import { instanteUtcDesdeHoraEcuador } from "../utils/horarioTiempo.js";
+//import { instanteUtcDesdeHoraEcuador } from "../utils/horarioTiempo.js";
+import { instanteUtcDesdeHoraEcuador, OFFSET_ECUADOR_HORAS } from "../utils/horarioTiempo.js";
 
 // Configuración de solicitudes.
 const VENTANA_RESOLUCION_MS = 800;
@@ -508,13 +509,24 @@ export async function soltarHoras(idReserva, idRepartidor) {
 }
 
 // Pasa a completada (6) cualquier reserva activa cuyo turno ya terminó.
-export async function finalizarReservasVencidas() {
+/* export async function finalizarReservasVencidas() {
     const [resultado] = await conmysql.query(
         `UPDATE horario_reservas hr
          JOIN horarios_disponibles hd ON hd.id_horario_disponible = hr.id_horario_disponible
          SET hr.reserva_estado = 6
          WHERE hr.reserva_estado = 1
            AND TIMESTAMP(hd.horario_fecha, hd.horario_hora_fin) <= NOW()`
+    );
+    return resultado.affectedRows;
+} */
+// Pasa a completada (6) cualquier reserva activa cuyo turno ya terminó.
+export async function finalizarReservasVencidas() {
+    const [resultado] = await conmysql.query(
+        `UPDATE horario_reservas hr
+         JOIN horarios_disponibles hd ON hd.id_horario_disponible = hr.id_horario_disponible
+         SET hr.reserva_estado = 6
+         WHERE hr.reserva_estado = 1
+           AND TIMESTAMP(hd.horario_fecha, hd.horario_hora_fin) <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ${OFFSET_ECUADOR_HORAS} HOUR)`
     );
     return resultado.affectedRows;
 }
