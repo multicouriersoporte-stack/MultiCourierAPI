@@ -338,7 +338,7 @@ const normalizarData = (datos = {}) => {
 // Construye el mensaje común para Android e iOS. Canal único "orders" de
 // alta prioridad (decisión tomada en el prompt, sección "Decisiones que
 // puedes tomar sin preguntar").
-const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => ({
+/* const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => ({
     ...(token && { token }),
     notification: { title: String(titulo), body: String(mensaje) },
     data,
@@ -357,7 +357,35 @@ const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => ({
         headers: { "apns-priority": "10" },
         payload: { aps: { sound: sonido, badge: 1 } },
     },
-});
+}); */
+const crearMensaje = ({ titulo, mensaje, data, sonido, token }) => {
+    const idPedido = data?.orderId || data?.pedido_id || null;
+
+    return {
+        ...(token && { token }),
+        notification: { title: String(titulo), body: String(mensaje) },
+        data,
+        android: {
+            priority: "high",
+            notification: {
+                channelId: CANAL_NOTIFICACIONES,
+                sound: sonido,
+                icon: "ic_launcher",
+                defaultVibrateTimings: true,
+                priority: "max",
+                visibility: "public",
+                ...(idPedido && { tag: `pedido_${idPedido}` }), // agrupa/reemplaza en la bandeja por pedido
+            },
+        },
+        apns: {
+            headers: {
+                "apns-priority": "10",
+                ...(idPedido && { "apns-collapse-id": `pedido_${idPedido}` }), // equivalente iOS
+            },
+            payload: { aps: { sound: sonido, badge: 1, "thread-id": idPedido ? `pedido_${idPedido}` : undefined } },
+        },
+    };
+};
 
 // Detecta tokens FCM que Firebase ya no reconoce.
 const esTokenInvalido = error =>
