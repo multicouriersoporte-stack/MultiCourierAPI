@@ -7,13 +7,8 @@ const normalizar = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f
 export const TIPO_PAGO = Object.freeze({ ONLINE: "ONLINE", EFECTIVO: "EFECTIVO" });
 
 const NOMBRES_ONLINE = ["TRANSFERENCIA", "DEPOSITO", "DE UNA", "DEUNA", "TARJETA", "BILLETERA"];
-const IDS_ONLINE_CONOCIDOS = [3, 5]; // 3 = TARJETA, 5 = BILLETERA (ya usados en pedidosCtrl)
+const IDS_ONLINE_CONOCIDOS = [3, 5]; // 3 = TARJETA, 5 = BILLETERA
 
-/**
- * Clasifica un método de pago como ONLINE o EFECTIVO.
- * Prioridad: columna metodo_pago_es_efectivo > nombre > id conocido.
- * Devuelve null si no se puede clasificar (el caller DEBE fallar en vez de adivinar con dinero de por medio).
- */
 export const clasificarMetodoPago = metodo => {
     if (!metodo) return null;
     const flag = metodo.metodo_pago_es_efectivo;
@@ -31,7 +26,6 @@ const numeroNoNegativo = (valor, nombre) => {
     return n;
 };
 
-/** Pago al repartidor = carrera - comisión + propina (+ otros). La comisión sale SOLO de la carrera. */
 export const calcularPagoRepartidor = ({ carrera, propina, porcentajeComision, otros = 0 }) => {
     const c = numeroNoNegativo(carrera, "La carrera");
     const p = numeroNoNegativo(propina, "La propina");
@@ -45,29 +39,76 @@ export const calcularPagoRepartidor = ({ carrera, propina, porcentajeComision, o
     };
 };
 
-/** Lo que recibe el local: subtotal - comisión. */
 export const calcularPagoLocal = ({ subtotal, porcentajeComision }) => {
     const s = numeroNoNegativo(subtotal, "El subtotal");
     const comision = redondear((s * numeroNoNegativo(porcentajeComision, "El porcentaje")) / 100);
     return { subtotal: redondear(s), comision, total: redondear(s - comision) };
 };
 
-/** Efectivo que el repartidor cobra físicamente al cliente: TODO el total si es efectivo, 0 si es online. */
 export const efectivoARecolectar = ({ tipo, pedido_total }) =>
     tipo === TIPO_PAGO.EFECTIVO ? redondear(numeroNoNegativo(pedido_total, "El total del pedido")) : 0;
 
-/** Estado del efectivo de un repartidor. Restringido cuando balance >= límite. */
+/**
+ * Estado del efectivo de un repartidor.
+ * CORRECCIÓN (Sección 5 de la especificación): la restricción se activa SOLO cuando el balance
+ * SUPERA el límite (balance > límite). balance == límite sigue habilitado.
+ * El código anterior usaba `balance >= limite`, que bloqueaba incorrectamente justo en el límite
+ * de cada repartidor (el límite es individual: repartidor_limite_billetera, no un valor fijo).
+ */
 export const evaluarEfectivo = ({ balance, limite, umbralAdvertenciaPct = 80 }) => {
     const b = redondear(balance ?? 0);
     const l = redondear(limite);
-    const restringido = b >= l;
+    const restringido = b > l;
+    // Con balance negativo el porcentaje puede salir negativo; se acota a 0 solo para la barra de progreso.
+    const porcentaje = l > 0 ? Math.max(0, Math.min(100, redondear((b / l) * 100))) : (b > 0 ? 100 : 0);
     return {
         balance: b,
         limite: l,
         disponible: redondear(Math.max(0, l - b)),
-        porcentaje: l > 0 ? Math.min(100, redondear((b / l) * 100)) : 100,
+        porcentaje,
         restringido,
         advertencia: !restringido && b >= redondear((l * umbralAdvertenciaPct) / 100),
         puede_recibir_efectivo: !restringido
+    };
+};
+
+/**
+ * Regla de depósito (Secciones 3, 7-14 de la especificación). El límite y el balance son SIEMPRE
+ * los del repartidor concreto que se está evaluando; no hay ningún valor fijo tipo "$100".
+ *
+ * - Balance <= 0: no hay nada que depositar (Sección 4: balance negativo nunca exige depósito).
+ * - 0 < Balance <= límite: mínimo = porcentajeMinimoNormal% del balance (80% por defecto);
+ *   recomendado = 100% del balance.
+ * - Balance > límite: NO hay mínimo bloqueante (Sección 14: se permite depósito parcial). Se informa
+ *   un "objetivo" (porcentajeObjetivoExceso% del límite, 20% por defecto) y cuánto se necesitaría
+ *   depositar para llegar a él — puramente informativo. Alcanzar ese objetivo NO es obligatorio
+ *   para desbloquear el efectivo: basta con volver a Balance <= límite.
+ */
+export const calcularReglaDeposito = ({ balance, limite, porcentajeMinimoNormal = 80, porcentajeObjetivoExceso = 20 }) => {
+    const b = redondear(balance ?? 0);
+    const l = redondear(limite);
+
+    if (b <= 0) {
+        return {
+            balance: b, limite: l, excede_limite: false, requiere_deposito: false,
+            minimo: 0, recomendado: 0, objetivo: null, deposito_para_objetivo: null
+        };
+    }
+
+    const excede = b > l;
+
+    if (!excede) {
+        const minimo = redondear((b * porcentajeMinimoNormal) / 100);
+        return {
+            balance: b, limite: l, excede_limite: false, requiere_deposito: true,
+            minimo, recomendado: b, objetivo: null, deposito_para_objetivo: null
+        };
+    }
+
+    const objetivo = redondear((l * porcentajeObjetivoExceso) / 100);
+    const depositoParaObjetivo = redondear(Math.max(0, b - objetivo));
+    return {
+        balance: b, limite: l, excede_limite: true, requiere_deposito: true,
+        minimo: 0, recomendado: b, objetivo, deposito_para_objetivo: depositoParaObjetivo
     };
 };
