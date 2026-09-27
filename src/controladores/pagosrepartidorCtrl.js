@@ -1,5 +1,5 @@
 import { conmysql } from "../db.js";
-import { clasificarMetodoPago, calcularPagoRepartidor as calcularPago } from "../servicios/finanzasCalculos.js";
+import { redondear, clasificarMetodoPago, calcularPagoRepartidor as calcularPago } from "../servicios/finanzasCalculos.js";
 
 // CONFIGURACIÓN
 const PORCENTAJE_COMISION_REPARTIDOR = 7.5;
@@ -212,7 +212,10 @@ export const postPagoRepartidor = async (req, res) => {
   }
 };
 
-// CONFIRMA EL PAGO DE GANANCIAS AL REPARTIDOR (Pago Pendiente -> Pagado). No toca el balance/deuda de efectivo.
+// CONFIRMA EL PAGO DE GANANCIAS AL REPARTIDOR (Pago Pendiente -> Pagado).
+// Ahora TAMBIÉN descuenta el Balance de efectivo (Secciones 3/19/23/24 de la especificación).
+// Solo aplica hacia adelante: si el pago ya estaba PAGADO, el guard de abajo corta antes de llegar
+// aquí, así que los pagos confirmados históricamente NUNCA generan este movimiento retroactivamente.
 export const confirmarPagoRepartidor = async (req, res) => {
   const conexion = await conmysql.getConnection();
   try {
@@ -245,14 +248,88 @@ export const confirmarPagoRepartidor = async (req, res) => {
       `UPDATE pagos_repartidor SET pago_repartidor_estado='PAGADO', pago_repartidor_confirmado_por=?, pago_repartidor_confirmado_fecha=NOW() WHERE id_pago_repartidor=?`,
       [idUsuario, id]
     );
+
+    let balance = null;
+    if (pago.id_repartidor) {
+      const [ajusteRows] = await conexion.query(
+        `SELECT COALESCE(SUM(pago_ajuste_monto),0) AS t FROM pagos_ajustes WHERE pago_ajuste_beneficiario='REPARTIDOR' AND id_pago=?`, [id]
+      );
+      const totalNeto = redondear(Number(pago.pago_repartidor_total || 0) + Number(ajusteRows[0].t || 0));
+      if (totalNeto !== 0) {
+        // Import dinámico: finanzasService.js importa este archivo, así se evita el ciclo (mismo patrón que postPagoRepartidor).
+        const { registrarMovimientoBalance } = await import("../servicios/finanzasService.js");
+        const mov = await registrarMovimientoBalance(conexion, {
+          id_repartidor: pago.id_repartidor, id_pedido: pago.id_pedido, tipo: "PAGO_CONFIRMADO", monto: -totalNeto,
+          concepto: `Pago de ganancias confirmado (pago #${id})`, clave: `PAGO:${id}`, id_usuario: idUsuario
+        });
+        balance = mov.movimiento;
+      }
+    }
+
     await conexion.commit();
 
     const [actualizado] = await conmysql.query(`SELECT * FROM pagos_repartidor WHERE id_pago_repartidor = ? LIMIT 1`, [id]);
-    return res.json({ success: true, message: "Pago al repartidor confirmado correctamente.", pago: actualizado[0] });
+    return res.json({ success: true, message: "Pago al repartidor confirmado correctamente.", pago: actualizado[0], balance });
   } catch (error) {
     try { await conexion.rollback(); } catch (_) { }
     console.error("[PagosRepartidor] Error confirmarPagoRepartidor:", error);
     return res.status(500).json({ success: false, message: "Error al confirmar el pago del repartidor.", error: error.message });
+  } finally {
+    conexion.release();
+  }
+};
+
+// ACTUALIZA EL ESTADO DEL PAGO. Si un pago que YA estaba PAGADO (ya había descontado el Balance)
+// se pasa a CANCELADO, se revierte ese descuento (idempotente por clave REV-PAGO:<id>).
+export const actualizarEstadoPagoRepartidor = async (req, res) => {
+  const conexion = await conmysql.getConnection();
+  try {
+    if (!req.usuario) { conexion.release(); return res.status(401).json({ success: false, message: "Usuario no autenticado." }); }
+    if (!tieneRol(req, ["SOPORTE", "ADMINISTRADOR"])) { conexion.release(); return res.status(403).json({ success: false, message: "No tienes permisos para actualizar pagos." }); }
+
+    const { id } = req.params;
+    const { estado } = req.body;
+    if (!esIdValido(id)) { conexion.release(); return res.status(400).json({ success: false, message: "El ID del pago no es válido." }); }
+
+    const estadosPermitidos = ["PENDIENTE", "PAGADO", "CANCELADO"];
+    const nuevoEstado = String(estado || "").trim().toUpperCase();
+    if (!estadosPermitidos.includes(nuevoEstado)) {
+      conexion.release();
+      return res.status(400).json({ success: false, message: `Estado inválido. Estados permitidos: ${estadosPermitidos.join(", ")}.` });
+    }
+
+    await conexion.beginTransaction();
+
+    const [existente] = await conexion.query(`SELECT * FROM pagos_repartidor WHERE id_pago_repartidor = ? LIMIT 1 FOR UPDATE`, [id]);
+    if (!existente.length) { await conexion.rollback(); return res.status(404).json({ success: false, message: "Pago no encontrado." }); }
+    const pago = existente[0];
+    const estadoAnterior = String(pago.pago_repartidor_estado || "").trim().toUpperCase();
+
+    await conexion.query(`UPDATE pagos_repartidor SET pago_repartidor_estado = ? WHERE id_pago_repartidor = ?`, [nuevoEstado, id]);
+
+    let balance = null;
+    if (estadoAnterior === "PAGADO" && nuevoEstado === "CANCELADO" && pago.id_repartidor) {
+      const [ajusteRows] = await conexion.query(
+        `SELECT COALESCE(SUM(pago_ajuste_monto),0) AS t FROM pagos_ajustes WHERE pago_ajuste_beneficiario='REPARTIDOR' AND id_pago=?`, [id]
+      );
+      const totalNeto = redondear(Number(pago.pago_repartidor_total || 0) + Number(ajusteRows[0].t || 0));
+      if (totalNeto !== 0) {
+        const { registrarMovimientoBalance } = await import("../servicios/finanzasService.js");
+        const mov = await registrarMovimientoBalance(conexion, {
+          id_repartidor: pago.id_repartidor, id_pedido: pago.id_pedido, tipo: "REVERSO", monto: totalNeto,
+          concepto: `Reverso de pago de ganancias cancelado (pago #${id})`, clave: `REV-PAGO:${id}`, id_usuario: obtenerIdUsuario(req)
+        });
+        balance = mov.movimiento;
+      }
+    }
+
+    await conexion.commit();
+    const [actualizado] = await conmysql.query(`SELECT * FROM pagos_repartidor WHERE id_pago_repartidor = ? LIMIT 1`, [id]);
+    return res.json({ success: true, message: "Estado del pago actualizado correctamente.", pago: actualizado[0], balance });
+  } catch (error) {
+    try { await conexion.rollback(); } catch (_) { }
+    console.error("[PagosRepartidor] Error actualizarEstadoPagoRepartidor:", error);
+    return res.status(500).json({ success: false, message: "Error al actualizar el estado del pago.", error: error.message });
   } finally {
     conexion.release();
   }
@@ -328,35 +405,6 @@ export const getMisPagosRepartidor = async (req, res) => {
   } catch (error) {
     console.error("[PagosRepartidor] Error getMisPagosRepartidor:", error);
     return res.status(500).json({ success: false, message: "Error al consultar los pagos del repartidor.", error: error.message });
-  }
-};
-
-// ACTUALIZA EL ESTADO DEL PAGO
-export const actualizarEstadoPagoRepartidor = async (req, res) => {
-  try {
-    if (!req.usuario) return res.status(401).json({ success: false, message: "Usuario no autenticado." });
-    if (!tieneRol(req, ["SOPORTE", "ADMINISTRADOR"])) return res.status(403).json({ success: false, message: "No tienes permisos para actualizar pagos." });
-
-    const { id } = req.params;
-    const { estado } = req.body;
-    if (!esIdValido(id)) return res.status(400).json({ success: false, message: "El ID del pago no es válido." });
-
-    const estadosPermitidos = ["PENDIENTE", "PAGADO", "CANCELADO"];
-    const nuevoEstado = String(estado || "").trim().toUpperCase();
-    if (!estadosPermitidos.includes(nuevoEstado)) {
-      return res.status(400).json({ success: false, message: `Estado inválido. Estados permitidos: ${estadosPermitidos.join(", ")}.` });
-    }
-
-    const [existente] = await conmysql.query(`SELECT * FROM pagos_repartidor WHERE id_pago_repartidor = ? LIMIT 1`, [id]);
-    if (!existente.length) return res.status(404).json({ success: false, message: "Pago no encontrado." });
-
-    await conmysql.query(`UPDATE pagos_repartidor SET pago_repartidor_estado = ? WHERE id_pago_repartidor = ?`, [nuevoEstado, id]);
-    const [actualizado] = await conmysql.query(`SELECT * FROM pagos_repartidor WHERE id_pago_repartidor = ? LIMIT 1`, [id]);
-
-    return res.json({ success: true, message: "Estado del pago actualizado correctamente.", pago: actualizado[0] });
-  } catch (error) {
-    console.error("[PagosRepartidor] Error actualizarEstadoPagoRepartidor:", error);
-    return res.status(500).json({ success: false, message: "Error al actualizar el estado del pago.", error: error.message });
   }
 };
 
