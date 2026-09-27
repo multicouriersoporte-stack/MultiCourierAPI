@@ -105,7 +105,7 @@ app.use("/api", productosRoutes);
 app.use("/api", pagolocalesRoutes);
 app.use("/api", pagorepartidorRoutes);
 app.use("/api", billeterasRoutes);
-app.use("/api", balanceRoutes);
+//app.use("/api", balanceRoutes);
 app.use("/api", finanzasRepartidorRoutes);
 app.use("/api", metodospagoRoutes);
 
