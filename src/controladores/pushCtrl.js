@@ -1,4 +1,19 @@
-/* import { conmysql } from "../db.js";
+// controladores/pushCtrl.js
+/* import { registrarTokenDispositivo, desactivarTokenDispositivo } from "../notifications/device.service.js";
+
+export const registrarToken = async (req, res) => {
+    const { status, body } = await registrarTokenDispositivo(req);
+    return res.status(status).json(body);
+};
+
+export const desactivarToken = async (req, res) => {
+    const { status, body } = await desactivarTokenDispositivo(req);
+    return res.status(status).json(body);
+};
+ */
+
+
+import { conmysql } from "../db.js";
 import { enviarPushMultiple } from "../ws/FCMPush.js";
 
 const obtenerIdUsuario = req => {
@@ -134,26 +149,3 @@ export const notificarNuevoPedidoAlLocal = (pedido, tipo = "nuevo_pedido") => en
     pedidoId: pedido?.id_pedido,
     codigoPedido: pedido?.pedido_codigo
 });
- */
-
-
-// src/ws/FCMPush.js
-//
-// Capa de bajo nivel: solo sabe hablar con FCM. No conoce pedidos, roles ni
-// la BD — eso vive en notification.service.js. Se mantiene la misma API
-// pública (enviarPush, enviarPushMultiple, etc.) para no romper imports
-// existentes; internamente ahora usa la inicialización centralizada de
-// src/config/firebase-admin.js en vez de crear su propia instancia de admin.
-
-// controladores/pushCtrl.js (nuevo, delgado)
-import { registrarTokenDispositivo, desactivarTokenDispositivo } from "../notifications/device.service.js";
-
-export const registrarToken = async (req, res) => {
-    const { status, body } = await registrarTokenDispositivo(req);
-    return res.status(status).json(body);
-};
-
-export const desactivarToken = async (req, res) => {
-    const { status, body } = await desactivarTokenDispositivo(req);
-    return res.status(status).json(body);
-};
