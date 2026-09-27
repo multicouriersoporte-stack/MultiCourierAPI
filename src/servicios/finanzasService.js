@@ -14,8 +14,10 @@ export class ErrorFinanzas extends Error {
 // Sección 5/7/13: los porcentajes son configurables vía `configuracion_financiera`; el límite y el
 // balance base son SIEMPRE los del repartidor individual (repartidor_limite_billetera).
 const CONFIG_DEFECTO = {
+    //limite_efectivo_default: 25, umbral_advertencia_pct: 80,
+    //deposito_porcentaje_minimo_normal: 80, deposito_porcentaje_objetivo_exceso: 20
     limite_efectivo_default: 25, umbral_advertencia_pct: 80,
-    deposito_porcentaje_minimo_normal: 80, deposito_porcentaje_objetivo_exceso: 20
+    deposito_porcentaje_objetivo_exceso: 20
 };
 const NOMBRE_ESTADO_BLOQUEADO = "INHABILITADO";
 const NOMBRE_ESTADO_DESBLOQUEADO = "DESCONECTADO";
@@ -81,7 +83,7 @@ export const estadoEfectivoRepartidor = async (id_repartidor, c = conmysql) => {
 
     const regla = calcularReglaDeposito({
         balance: rep.repartidor_balance_efectivo, limite,
-        porcentajeMinimoNormal: cfg.deposito_porcentaje_minimo_normal,
+        //porcentajeMinimoNormal: cfg.deposito_porcentaje_minimo_normal,
         porcentajeObjetivoExceso: cfg.deposito_porcentaje_objetivo_exceso
     });
 
@@ -89,7 +91,7 @@ export const estadoEfectivoRepartidor = async (id_repartidor, c = conmysql) => {
     // pendiente, el monto declarado puede haber dejado de alcanzar el nuevo mínimo. No se invalida
     // automáticamente la solicitud (la confirmación sigue siendo decisión de SOPORTE/ADMINISTRADOR),
     // pero se expone la alerta para que el repartidor y el admin la vean.
-    let alerta_recalculo = null;
+/*     let alerta_recalculo = null;
     if (depositoPendiente && !regla.excede_limite && Number(depositoPendiente.deposito_monto) < regla.minimo) {
         alerta_recalculo = {
             id_deposito: depositoPendiente.id_deposito,
@@ -97,8 +99,23 @@ export const estadoEfectivoRepartidor = async (id_repartidor, c = conmysql) => {
             nuevo_minimo: regla.minimo,
             mensaje: `Tu Balance cambió. El monto mínimo de depósito debe recalcularse: ahora es ${regla.minimo} de ${regla.balance} de Balance.`
         };
-    }
+    } */
 
+    // El depósito es fijo al 100%; si el Balance cambió, el monto declarado (fijado al crear el
+    // depósito) puede ya no coincidir con el 100% actual. Se avisa aunque siga siendo confirmable.
+    let alerta_recalculo = null;
+    if (depositoPendiente && !regla.excede_limite) {
+        const montoDeclarado = redondear(depositoPendiente.deposito_monto);
+        if (montoDeclarado !== regla.minimo) {
+            alerta_recalculo = {
+                id_deposito: depositoPendiente.id_deposito,
+                monto_declarado: montoDeclarado,
+                nuevo_minimo: regla.minimo,
+                mensaje: `Tu Balance cambió. Ahora debes depositar el 100% de tu Balance: ${regla.minimo}.`
+            };
+        }
+    }
+    
     return {
         id_repartidor: Number(id_repartidor),
         ...evaluarEfectivo({ balance: rep.repartidor_balance_efectivo, limite, umbralAdvertenciaPct: cfg.umbral_advertencia_pct }),
@@ -297,7 +314,7 @@ export const crearDeposito = ({ id_repartidor, monto, referencia = null, comprob
     const limite = limiteDe(rep, cfg);
     const regla = calcularReglaDeposito({
         balance: rep.repartidor_balance_efectivo, limite,
-        porcentajeMinimoNormal: cfg.deposito_porcentaje_minimo_normal,
+        //porcentajeMinimoNormal: cfg.deposito_porcentaje_minimo_normal,
         porcentajeObjetivoExceso: cfg.deposito_porcentaje_objetivo_exceso
     });
 
@@ -305,9 +322,12 @@ export const crearDeposito = ({ id_repartidor, monto, referencia = null, comprob
         throw new ErrorFinanzas(`No tienes efectivo pendiente por depositar. Tu Balance actual es ${regla.balance}.`, 400, "SIN_EFECTIVO_PENDIENTE");
     if (m > regla.balance)
         throw new ErrorFinanzas(`El depósito (${m}) supera tu Balance actual (${regla.balance}).`, 409, "DEPOSITO_EXCEDE_BALANCE");
-    if (!regla.excede_limite && m < regla.minimo)
-        throw new ErrorFinanzas(`Debes depositar como mínimo ${regla.minimo} de los ${regla.balance} de Balance.`, 400, "DEPOSITO_MENOR_AL_MINIMO");
+/*     if (!regla.excede_limite && m < regla.minimo)
+        throw new ErrorFinanzas(`Debes depositar como mínimo ${regla.minimo} de los ${regla.balance} de Balance.`, 400, "DEPOSITO_MENOR_AL_MINIMO"); */
+    if (!regla.excede_limite && m !== regla.minimo)
+        throw new ErrorFinanzas(`Debes depositar el 100% de tu Balance: ${regla.minimo}.`, 400, "DEPOSITO_DEBE_SER_100_POR_CIENTO");
 
+    
     const [ins] = await c.query(`INSERT INTO repartidor_depositos (id_repartidor,deposito_monto,deposito_referencia,deposito_comprobante_url) VALUES (?,?,?,?)`,
         [id_repartidor, m, referencia, comprobante_url]);
     await auditar(c, "DEPOSITO", ins.insertId, "CREADO", { monto: m, referencia, balance_al_crear: regla.balance }, id_usuario);
@@ -316,9 +336,14 @@ export const crearDeposito = ({ id_repartidor, monto, referencia = null, comprob
         id_deposito: ins.insertId, monto: m, estado: "PENDIENTE",
         regla_deposito: regla,
         es_100_por_ciento: m >= regla.recomendado,
-        recomendacion: m < regla.recomendado
+/*         recomendacion: m < regla.recomendado
             ? `Has alcanzado el depósito mínimo${!regla.excede_limite ? ` de ${regla.minimo}` : ""}. Se recomienda depositar el 100% (${regla.recomendado}).`
-            : "Has depositado el 100% de tu Balance."
+            : "Has depositado el 100% de tu Balance." */
+        recomendacion: regla.monto_fijo
+            ? "Has depositado el 100% de tu Balance."
+            : (m < regla.recomendado
+                ? `Registrado. Se recomienda depositar el 100% de tu Balance (${regla.recomendado}) para desbloquear antes.`
+                : "Has depositado el 100% de tu Balance.")
     };
 });
 
