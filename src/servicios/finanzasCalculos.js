@@ -73,35 +73,32 @@ export const evaluarEfectivo = ({ balance, limite, umbralAdvertenciaPct = 80 }) 
 };
 
 /**
- * Regla de depósito (Secciones 3, 7-14 de la especificación). El límite y el balance son SIEMPRE
- * los del repartidor concreto que se está evaluando; no hay ningún valor fijo tipo "$100".
+ * Regla de depósito. El límite y el balance son SIEMPRE los del repartidor concreto.
  *
- * - Balance <= 0: no hay nada que depositar (Sección 4: balance negativo nunca exige depósito).
- * - 0 < Balance <= límite: mínimo = porcentajeMinimoNormal% del balance (80% por defecto);
- *   recomendado = 100% del balance.
- * - Balance > límite: NO hay mínimo bloqueante (Sección 14: se permite depósito parcial). Se informa
- *   un "objetivo" (porcentajeObjetivoExceso% del límite, 20% por defecto) y cuánto se necesitaría
- *   depositar para llegar a él — puramente informativo. Alcanzar ese objetivo NO es obligatorio
- *   para desbloquear el efectivo: basta con volver a Balance <= límite.
+ * - Balance <= 0: no hay nada que depositar.
+ * - 0 < Balance <= límite: el depósito es OBLIGATORIO al 100% del balance (monto_fijo: true).
+ *   No hay opción de depositar menos.
+ * - Balance > límite (Sección 14): sigue permitido el depósito parcial (monto_fijo: false).
+ *   Se informa un "objetivo" (20% del límite) puramente orientativo; no es obligatorio alcanzarlo,
+ *   basta con volver a Balance <= límite. Se sigue recomendando el 100%.
  */
-export const calcularReglaDeposito = ({ balance, limite, porcentajeMinimoNormal = 80, porcentajeObjetivoExceso = 20 }) => {
+export const calcularReglaDeposito = ({ balance, limite, porcentajeObjetivoExceso = 20 }) => {
     const b = redondear(balance ?? 0);
     const l = redondear(limite);
 
     if (b <= 0) {
         return {
             balance: b, limite: l, excede_limite: false, requiere_deposito: false,
-            minimo: 0, recomendado: 0, objetivo: null, deposito_para_objetivo: null
+            minimo: 0, recomendado: 0, monto_fijo: false, objetivo: null, deposito_para_objetivo: null
         };
     }
 
     const excede = b > l;
 
     if (!excede) {
-        const minimo = redondear((b * porcentajeMinimoNormal) / 100);
         return {
             balance: b, limite: l, excede_limite: false, requiere_deposito: true,
-            minimo, recomendado: b, objetivo: null, deposito_para_objetivo: null
+            minimo: b, recomendado: b, monto_fijo: true, objetivo: null, deposito_para_objetivo: null
         };
     }
 
@@ -109,6 +106,6 @@ export const calcularReglaDeposito = ({ balance, limite, porcentajeMinimoNormal 
     const depositoParaObjetivo = redondear(Math.max(0, b - objetivo));
     return {
         balance: b, limite: l, excede_limite: true, requiere_deposito: true,
-        minimo: 0, recomendado: b, objetivo, deposito_para_objetivo: depositoParaObjetivo
+        minimo: 0, recomendado: b, monto_fijo: false, objetivo, deposito_para_objetivo: depositoParaObjetivo
     };
 };
