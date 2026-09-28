@@ -24,6 +24,7 @@ import pedidorepartidoresRoutes from "./routes/pedidorepartidores.routes.js";
 import pedidosseleccionrepartidorRoutes from "./routes/pedidosseleccionrepartidor.routes.js";
 import pedidoobservacionesRoutes from "./routes/pedidoobservaciones.routes.js";
 import productosRoutes from "./routes/productos.routes.js";
+import categoriasProductoRoutes from "./routes/categoriasProducto.routes.js";
 import pagolocalesRoutes from "./routes/pagoslocales.routes.js";
 import pagorepartidorRoutes from "./routes/pagosrepartidor.routes.js";
 import billeterasRoutes from "./routes/billeteras.routes.js";
@@ -102,6 +103,7 @@ app.use("/api", pedidosseleccionrepartidorRoutes);
 app.use("/api", pedidoobservacionesRoutes);
 
 app.use("/api", productosRoutes);
+app.use("/api", categoriasProductoRoutes);
 app.use("/api", pagolocalesRoutes);
 app.use("/api", pagorepartidorRoutes);
 app.use("/api", billeterasRoutes);
