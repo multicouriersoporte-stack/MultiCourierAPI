@@ -26,7 +26,7 @@ export async function obtenerEstadoConexion(idRepartidor) {
         `SELECT hr.id_reserva, hd.horario_fecha, hd.horario_hora_inicio, hd.horario_hora_fin
          FROM horario_reservas hr
          INNER JOIN horarios_disponibles hd ON hd.id_horario_disponible = hr.id_horario_disponible
-         WHERE hr.id_repartidor = ? AND hr.reserva_estado = 1 AND hd.horario_fecha = CURDATE()
+         WHERE hr.id_repartidor = ? AND hr.reserva_estado = 1 AND hd.horario_fecha = DATE(DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR))
          ORDER BY hd.horario_hora_inicio ASC`,
         [idRepartidor]
     );
@@ -66,7 +66,7 @@ export async function conectarRepartidor(idRepartidor) {
         await conn.beginTransaction();
 
         const [[repartidor]] = await conn.query(
-            `SELECT id_estado_repartidor FROM repartidores WHERE id_repartidor = ? FOR UPDATE`,
+            `SELECT id_estado_repartidor FROM repartidores WHERE id_repartidor = ?`, //FOR UPDATE
             [idRepartidor]
         );
         if (!repartidor) throw Object.assign(new Error("El repartidor no existe"), { codigo: "NO_EXISTE" });
@@ -78,8 +78,8 @@ export async function conectarRepartidor(idRepartidor) {
             `SELECT hr.id_reserva, hd.horario_fecha, hd.horario_hora_inicio, hd.horario_hora_fin
              FROM horario_reservas hr
              INNER JOIN horarios_disponibles hd ON hd.id_horario_disponible = hr.id_horario_disponible
-             WHERE hr.id_repartidor = ? AND hr.reserva_estado = 1 AND hd.horario_fecha = CURDATE()
-             ORDER BY hd.horario_hora_inicio ASC FOR UPDATE`,
+             WHERE hr.id_repartidor = ? AND hr.reserva_estado = 1 AND hd.horario_fecha = DATE(DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR))
+             ORDER BY hd.horario_hora_inicio ASC`, //FOR UPDATE
             [idRepartidor]
         );
 
@@ -122,9 +122,9 @@ export async function activarTurnosIniciados() {
          INNER JOIN horarios_disponibles hd ON hd.id_horario_disponible = hr.id_horario_disponible
          SET r.id_estado_repartidor = ${ESTADO_REPARTIDOR.REPARTIENDO}
          WHERE r.id_estado_repartidor = ${ESTADO_REPARTIDOR.LISTO}
-           AND hd.horario_fecha = CURDATE()
-           AND CURTIME() >= hd.horario_hora_inicio
-           AND CURTIME() < hd.horario_hora_fin`
+           AND hd.horario_fecha = DATE(DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR))
+           AND TIME(DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR)) >= hd.horario_hora_inicio
+           AND TIME(DATE_SUB(UTC_TIMESTAMP(), INTERVAL 5 HOUR)) < hd.horario_hora_fin`
     );
     return resultado.affectedRows;
 }
