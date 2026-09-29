@@ -1,55 +1,48 @@
 import cron from "node-cron";
-
-//import { generarHorariosSemana, limpiarSemanaAnterior } from "./Horarios.generacion.service.js";
 import { generarHorariosSemana, finalizarHorariosVencidos, purgarHistorialAntiguo } from "./Horarios.generacion.service.js";
 import { finalizarReservasVencidas } from "./Reservas.service.js";
 
-function siguienteLunes(desde = new Date()) {
-    const fecha = new Date(desde);
-    const dia = fecha.getDay(); // 0 = domingo
+const OFFSET_MS = 5 * 3600 * 1000; // Ecuador UTC-5
 
-    const diasHastaLunes =
-        dia === 0 ? 1 : (8 - dia) % 7 || 7;
+function hoyEcuador() {
+    const d = new Date(Date.now() - OFFSET_MS);
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+function lunesDe(fecha) {
+    const d = new Date(fecha);
+    const dia = d.getUTCDay();
+    d.setUTCDate(d.getUTCDate() - (dia === 0 ? 6 : dia - 1));
+    return d;
+}
+const iso = f => f.toISOString().slice(0, 10);
 
-    fecha.setDate(fecha.getDate() + diasHastaLunes);
-    fecha.setHours(0, 0, 0, 0);
+let corriendo = false;
+// Garantiza que existan la semana actual (días que faltan desde hoy) y la siguiente.
+export async function asegurarHorarios() {
+    if (corriendo) return;
+    corriendo = true;
+    try {
+        const hoy = hoyEcuador();
+        const lunesActual = lunesDe(hoy);
+        const lunesSiguiente = new Date(lunesActual); lunesSiguiente.setUTCDate(lunesSiguiente.getUTCDate() + 7);
 
-    return fecha;
+        await purgarHistorialAntiguo(lunesActual);
+        for (const lunes of [lunesActual, lunesSiguiente]) {
+            const r = await generarHorariosSemana(lunes, { desdeISO: iso(hoy) });
+            if (r.generado) console.log("[cron] Horarios generados:", r);
+        }
+    } catch (error) {
+        console.error("[cron] Error asegurando horarios:", error);
+    } finally {
+        corriendo = false;
+    }
 }
 
-// Corre todos los domingos a las 20:00,
-// usando la hora de Ecuador.
-cron.schedule(
-    "30 17 * * 3",
-    async () => {
-        try {
-            const lunesQueViene = siguienteLunes();
+// Cada hora y también al arrancar (por si el servidor estaba dormido).
+cron.schedule("5 * * * *", asegurarHorarios, { timezone: "America/Guayaquil" });
+asegurarHorarios();
 
-            console.log(
-                "[cron] Generando horarios para la semana del",
-                lunesQueViene.toISOString().slice(0, 10)
-            );
-
-            await limpiarSemanaAnterior(lunesQueViene);
-
-            const resultado =
-                await generarHorariosSemana(lunesQueViene);
-
-            console.log("[cron] Resultado:", resultado);
-
-        } catch (error) {
-            console.error(
-                "[cron] Error generando horarios semanales:",
-                error
-            );
-        }
-    },
-    {
-        timezone: "America/Guayaquil"
-    }
-);
-
-// Cada 10 minutos: pasa a "finalizado"/"completada" lo que ya terminó.
+// Cada 10 minutos: finaliza lo que ya terminó.
 cron.schedule("*/10 * * * *", async () => {
     try {
         await finalizarHorariosVencidos();
@@ -59,20 +52,4 @@ cron.schedule("*/10 * * * *", async () => {
     }
 });
 
-// Semanal: genera la semana nueva y purga todo lo anterior a la semana pasada.
-cron.schedule(
-    "30 17 * * 3",
-    async () => {
-        try {
-            const lunesQueViene = siguienteLunes();
-            await purgarHistorialAntiguo(lunesQueViene);
-            const resultado = await generarHorariosSemana(lunesQueViene);
-            console.log("[cron] Resultado:", resultado);
-        } catch (error) {
-            console.error("[cron] Error generando horarios semanales:", error);
-        }
-    },
-    { timezone: "America/Guayaquil" }
-);
-
-console.log("[cron] Job de horarios semanales cargado");
+console.log("[cron] Job de horarios cargado");
