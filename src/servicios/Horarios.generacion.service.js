@@ -48,7 +48,7 @@ export function generarSlotsDelDia(fechaISO) {
 }
 
 // Genera los horarios de lunes a domingo evitando duplicar semanas.
-export async function generarHorariosSemana(fechaLunes) {
+/* export async function generarHorariosSemana(fechaLunes) {
     const semanaInicioISO = aISO(fechaLunes);
     const semanaFinISO = aISO(sumarDias(fechaLunes, 6));
     const conn = await conmysql.getConnection();
@@ -83,6 +83,47 @@ export async function generarHorariosSemana(fechaLunes) {
             [semanaInicioISO, semanaFinISO, filas.length]
         );
 
+        await conn.commit();
+        return { generado: true, total: filas.length, semanaInicio: semanaInicioISO };
+    } catch (error) {
+        await conn.rollback();
+        throw error;
+    } finally {
+        conn.release();
+    }
+} */
+export async function generarHorariosSemana(fechaLunes, { desdeISO = null } = {}) {
+    const semanaInicioISO = aISO(fechaLunes);
+    const semanaFinISO = aISO(sumarDias(fechaLunes, 6));
+    const conn = await conmysql.getConnection();
+    try {
+        await conn.beginTransaction();
+        let filas = [];
+        for (let i = 0; i < 7; i++) {
+            const fechaISO = aISO(sumarDias(fechaLunes, i));
+            if (desdeISO && fechaISO < desdeISO) continue;
+            const [[{ total }]] = await conn.query(
+                `SELECT COUNT(*) AS total FROM horarios_disponibles WHERE horario_fecha = ?`, [fechaISO]
+            );
+            if (total === 0) filas = filas.concat(generarSlotsDelDia(fechaISO));
+        }
+        if (filas.length === 0) {
+            await conn.rollback();
+            return { generado: false, motivo: "La semana ya tiene todos sus horarios" };
+        }
+        await conn.query(
+            `INSERT INTO horarios_disponibles
+             (horario_fecha, horario_hora_inicio, horario_hora_fin, horario_duracion_minutos,
+              horario_cupos_totales, horario_cupos_disponibles, horario_estado) VALUES ?`,
+            [filas]
+        );
+        const [gen] = await conn.query(`SELECT id_generacion FROM horario_generaciones WHERE semana_inicio = ?`, [semanaInicioISO]);
+        if (gen.length === 0) {
+            await conn.query(
+                `INSERT INTO horario_generaciones (semana_inicio, semana_fin, total_horarios_creados) VALUES (?, ?, ?)`,
+                [semanaInicioISO, semanaFinISO, filas.length]
+            );
+        }
         await conn.commit();
         return { generado: true, total: filas.length, semanaInicio: semanaInicioISO };
     } catch (error) {
