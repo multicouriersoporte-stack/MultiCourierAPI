@@ -10,7 +10,10 @@ export const getLocales = async (req, res) => {
         return res.json(result.map(calcularEstado));
     } catch (error) {
         console.error("Error getLocales:", error);
-        return res.status(500).json({ message: "Error al consultar locales", error: error.message });
+        return res.status(500).json({
+            message: "Error al consultar locales",
+            error: error.message,
+        });
     }
 };
 
@@ -28,7 +31,10 @@ export const getLocalxid = async (req, res) => {
         return res.json(calcularEstado(result[0]));
     } catch (error) {
         console.error("Error getLocalxid:", error);
-        return res.status(500).json({ message: "Error del servidor", error: error.message });
+        return res.status(500).json({
+            message: "Error del servidor",
+            error: error.message,
+        });
     }
 };
 
@@ -41,12 +47,17 @@ export const getLocalPorUsuario = async (req, res) => {
             [id_usuario]
         );
         if (result.length === 0) {
-            return res.status(404).json({ message: "No existe un local asociado a este usuario" });
+            return res.status(404).json({
+                message: "No existe un local asociado a este usuario",
+            });
         }
         return res.json(calcularEstado(result[0]));
     } catch (error) {
         console.error("Error getLocalPorUsuario:", error);
-        return res.status(500).json({ message: "Error del servidor", error: error.message });
+        return res.status(500).json({
+            message: "Error del servidor",
+            error: error.message,
+        });
     }
 };
 
@@ -64,7 +75,10 @@ export const getLocalPorCodigo = async (req, res) => {
         return res.json(calcularEstado(result[0]));
     } catch (error) {
         console.error("Error getLocalPorCodigo:", error);
-        return res.status(500).json({ message: "Error del servidor", error: error.message });
+        return res.status(500).json({
+            message: "Error del servidor",
+            error: error.message,
+        });
     }
 };
 
@@ -82,7 +96,10 @@ export const getLocalPorRuc = async (req, res) => {
         return res.json(calcularEstado(result[0]));
     } catch (error) {
         console.error("Error getLocalPorRuc:", error);
-        return res.status(500).json({ message: "Error del servidor", error: error.message });
+        return res.status(500).json({
+            message: "Error del servidor",
+            error: error.message,
+        });
     }
 };
 
@@ -91,21 +108,28 @@ export const buscarLocales = async (req, res) => {
     try {
         const { nombre } = req.query;
         if (!nombre) {
-            return res.status(400).json({ message: "Debe proporcionar un nombre para buscar" });
+            return res.status(400).json({
+                message: "Debe proporcionar un nombre para buscar",
+            });
         }
         const [result] = await conmysql.query(
-            `SELECT * FROM locales WHERE local_nombre_comercial LIKE ? ORDER BY local_nombre_comercial ASC`,
+            `SELECT * FROM locales
+             WHERE local_nombre_comercial LIKE ?
+             ORDER BY local_nombre_comercial ASC`,
             [`%${nombre}%`]
         );
         return res.json(result.map(calcularEstado));
     } catch (error) {
         console.error("Error buscarLocales:", error);
-        return res.status(500).json({ message: "Error al buscar locales", error: error.message });
+        return res.status(500).json({
+            message: "Error al buscar locales",
+            error: error.message,
+        });
     }
 };
 
 // POST: Crear local
-// - No recibe id_estado ni modo manual: se crean en AUTO (default DB)
+// Los campos de modo manual usan los DEFAULT de la tabla (AUTO, NULL, NULL)
 export const postLocales = async (req, res) => {
     try {
         const {
@@ -131,7 +155,8 @@ export const postLocales = async (req, res) => {
             local_tiempo_preparacion_promedio,
             local_hora_apertura,
             local_hora_cierre,
-            local_fecha_registro
+            local_fecha_registro,
+            id_estado, // estado general del registro (activo/inactivo), no el open/close
         } = req.body;
 
         const [result] = await conmysql.query(
@@ -141,8 +166,8 @@ export const postLocales = async (req, res) => {
                 local_filtro, id_provincia, id_canton, local_direccion, local_referencia,
                 local_latitud, local_longitud, local_calificacion, local_comision_porcentaje,
                 local_tiempo_preparacion_promedio, local_hora_apertura, local_hora_cierre,
-                local_fecha_registro
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                local_fecha_registro, id_estado
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 id_usuario,
                 local_codigo,
@@ -166,27 +191,32 @@ export const postLocales = async (req, res) => {
                 local_tiempo_preparacion_promedio,
                 local_hora_apertura,
                 local_hora_cierre,
-                local_fecha_registro
+                local_fecha_registro,
+                id_estado,
             ]
         );
 
+        // Devolvemos el local recién creado con el estado calculado
         const [rows] = await conmysql.query(
             `SELECT * FROM locales WHERE id_local = ?`,
             [result.insertId]
         );
 
         return res.status(201).json({
-            id_local: result.insertId,
             message: "Local registrado con éxito",
-            local: calcularEstado(rows[0])
+            local: calcularEstado(rows[0]),
         });
     } catch (error) {
         console.error("Error postLocales:", error);
-        return res.status(500).json({ message: "Error al registrar local", error: error.message });
+        return res.status(500).json({
+            message: "Error al registrar local",
+            error: error.message,
+        });
     }
 };
 
-// PUT: Actualización completa (sin tocar estado / modo manual)
+// PUT: Actualización completa
+// NO se actualizan: id_estado, local_modo_manual, local_manual_desde, local_manual_hasta
 export const putLocales = async (req, res) => {
     try {
         const { id } = req.params;
@@ -213,7 +243,7 @@ export const putLocales = async (req, res) => {
             local_tiempo_preparacion_promedio,
             local_hora_apertura,
             local_hora_cierre,
-            local_fecha_registro
+            local_fecha_registro,
         } = req.body;
 
         const [result] = await conmysql.query(
@@ -266,7 +296,7 @@ export const putLocales = async (req, res) => {
                 local_hora_apertura,
                 local_hora_cierre,
                 local_fecha_registro,
-                id
+                id,
             ]
         );
 
@@ -281,16 +311,19 @@ export const putLocales = async (req, res) => {
         return res.json(calcularEstado(rows[0]));
     } catch (error) {
         console.error("Error putLocales:", error);
-        return res.status(500).json({ message: "Error al actualizar local", error: error.message });
+        return res.status(500).json({
+            message: "Error al actualizar local",
+            error: error.message,
+        });
     }
 };
 
-// PATCH: Actualización parcial (solo datos de negocio; NO estado/modo)
+// PATCH: Actualización parcial
+// NO se permiten: id_estado, local_modo_manual, local_manual_desde, local_manual_hasta
 export const patchLocales = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Campos editables (sin id_estado ni modo manual)
         const camposPermitidos = [
             "local_nombre_comercial",
             "local_razon_social",
@@ -312,7 +345,7 @@ export const patchLocales = async (req, res) => {
             "local_tiempo_preparacion_promedio",
             "local_hora_apertura",
             "local_hora_cierre",
-            "local_fecha_registro"
+            // Si necesitas permitir id_usuario u otros, agrégalos aquí
         ];
 
         const campos = [];
@@ -327,7 +360,7 @@ export const patchLocales = async (req, res) => {
 
         if (campos.length === 0) {
             return res.status(400).json({
-                message: "No se proporcionaron campos válidos para actualizar"
+                message: "No se proporcionaron campos válidos para actualizar",
             });
         }
 
@@ -356,24 +389,27 @@ export const patchLocales = async (req, res) => {
 
         return res.json({
             message: "Local actualizado correctamente",
-            local: calcularEstado(rows[0])
+            local: calcularEstado(rows[0]),
         });
     } catch (error) {
         console.error("❌ Error patchLocales:", error);
-        return res.status(500).json({ message: "Error al actualizar local", error: error.message });
+        return res.status(500).json({
+            message: "Error al actualizar local",
+            error: error.message,
+        });
     }
 };
 
-// PATCH: Abrir/cerrar manualmente (único endpoint que toca el modo)
+// PATCH: Abrir/cerrar manualmente (único endpoint que toca los campos de modo manual)
 export const cambiarEstadoLocal = async (req, res) => {
     try {
         const { id } = req.params;
         const { id_estado } = req.body;
-        const estado = Number(id_estado);
 
+        const estado = Number(id_estado);
         if (![1, 2].includes(estado)) {
             return res.status(400).json({
-                message: "El estado debe ser 1 (ABIERTO) o 2 (CERRADO)"
+                message: "El estado debe ser 1 (ABIERTO) o 2 (CERRADO)",
             });
         }
 
@@ -387,19 +423,23 @@ export const cambiarEstadoLocal = async (req, res) => {
 
         const local = rows[0];
         const quiereAbrir = estado === 1;
-        const auto = abiertoPorHorario(local.local_hora_apertura, local.local_hora_cierre);
+        const auto = abiertoPorHorario(
+            local.local_hora_apertura,
+            local.local_hora_cierre
+        );
 
         let modo;
         let desde = null;
         let hasta = null;
 
         if (quiereAbrir === auto) {
-            // Coincide con el horario → vuelve a AUTO
+            // Coincide con el horario → vuelve a modo automático
             modo = "AUTO";
         } else {
             modo = quiereAbrir ? "ABIERTO" : "CERRADO";
             desde = Date.now();
-            // Abierto manual → hasta el próximo cierre; cerrado manual → hasta la próxima apertura
+            // Abierto manual → hasta el cierre automático
+            // Cerrado manual → hasta la apertura automática
             hasta = proximaOcurrencia(
                 quiereAbrir ? local.local_hora_cierre : local.local_hora_apertura
             );
@@ -422,13 +462,13 @@ export const cambiarEstadoLocal = async (req, res) => {
             message: localCalc.local_abierto
                 ? "Local abierto correctamente"
                 : "Local cerrado correctamente",
-            local: localCalc
+            local: localCalc,
         });
     } catch (error) {
         console.error("Error cambiarEstadoLocal:", error);
         return res.status(500).json({
             message: "Error al cambiar el estado del local",
-            error: error.message
+            error: error.message,
         });
     }
 };
@@ -447,6 +487,9 @@ export const deleteLocales = async (req, res) => {
         return res.status(204).send();
     } catch (error) {
         console.error("Error deleteLocales:", error);
-        return res.status(500).json({ message: "Error al eliminar local", error: error.message });
+        return res.status(500).json({
+            message: "Error al eliminar local",
+            error: error.message,
+        });
     }
 };
