@@ -123,18 +123,18 @@ export const putLocales = async (req, res) => {
             local_filtro, id_provincia, id_canton, local_direccion, local_referencia,
             local_latitud, local_longitud, local_calificacion, local_comision_porcentaje,
             local_tiempo_preparacion_promedio, local_hora_apertura, local_hora_cierre,
-            local_fecha_registro, id_estado
+            local_fecha_registro
         } = req.body;
 
         const [result] = await conmysql.query(
-            `UPDATE locales SET id_usuario = ?, local_codigo = ?, local_nombre_comercial = ?, local_razon_social = ?, local_ruc = ?, local_descripcion = ?, local_foto = ?, local_telefono = ?, local_email = ?, local_categoria = ?, local_filtro = ?, id_provincia = ?, id_canton = ?, local_direccion = ?, local_referencia = ?, local_latitud = ?, local_longitud = ?, local_calificacion = ?, local_comision_porcentaje = ?, local_tiempo_preparacion_promedio = ?, local_hora_apertura = ?, local_hora_cierre = ?, local_fecha_registro = ?, id_estado = ? WHERE id_local = ?`,
+            `UPDATE locales SET id_usuario = ?, local_codigo = ?, local_nombre_comercial = ?, local_razon_social = ?, local_ruc = ?, local_descripcion = ?, local_foto = ?, local_telefono = ?, local_email = ?, local_categoria = ?, local_filtro = ?, id_provincia = ?, id_canton = ?, local_direccion = ?, local_referencia = ?, local_latitud = ?, local_longitud = ?, local_calificacion = ?, local_comision_porcentaje = ?, local_tiempo_preparacion_promedio = ?, local_hora_apertura = ?, local_hora_cierre = ?, local_fecha_registro = ? WHERE id_local = ?`,
             [
                 id_usuario, local_codigo, local_nombre_comercial, local_razon_social, local_ruc,
                 local_descripcion, local_foto, local_telefono, local_email, local_categoria,
                 local_filtro, id_provincia, id_canton, local_direccion, local_referencia,
                 local_latitud, local_longitud, local_calificacion, local_comision_porcentaje,
                 local_tiempo_preparacion_promedio, local_hora_apertura, local_hora_cierre,
-                local_fecha_registro, id_estado, id
+                local_fecha_registro, id
             ]
         );
 
