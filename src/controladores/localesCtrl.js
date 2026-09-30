@@ -4,7 +4,9 @@ import { calcularEstado, abiertoPorHorario, proximaOcurrencia } from "../utils/e
 // GET: Obtener todos los locales
 export const getLocales = async (req, res) => {
     try {
-        const [result] = await conmysql.query(`SELECT * FROM locales ORDER BY local_nombre_comercial ASC`);
+        const [result] = await conmysql.query(
+            `SELECT * FROM locales ORDER BY local_nombre_comercial ASC`
+        );
         return res.json(result.map(calcularEstado));
     } catch (error) {
         console.error("Error getLocales:", error);
@@ -16,9 +18,14 @@ export const getLocales = async (req, res) => {
 export const getLocalxid = async (req, res) => {
     try {
         const { id } = req.params;
-        const [result] = await conmysql.query(`SELECT * FROM locales WHERE id_local = ?`, [id]);
-        if (result.length === 0) return res.status(404).json({ id_local: 0, message: "Local no encontrado" });
-        return res.json(calcularEstado(result[0]));  
+        const [result] = await conmysql.query(
+            `SELECT * FROM locales WHERE id_local = ?`,
+            [id]
+        );
+        if (result.length === 0) {
+            return res.status(404).json({ id_local: 0, message: "Local no encontrado" });
+        }
+        return res.json(calcularEstado(result[0]));
     } catch (error) {
         console.error("Error getLocalxid:", error);
         return res.status(500).json({ message: "Error del servidor", error: error.message });
@@ -29,9 +36,14 @@ export const getLocalxid = async (req, res) => {
 export const getLocalPorUsuario = async (req, res) => {
     try {
         const { id_usuario } = req.params;
-        const [result] = await conmysql.query(`SELECT * FROM locales WHERE id_usuario = ?`, [id_usuario]);
-        if (result.length === 0) return res.status(404).json({ message: "No existe un local asociado a este usuario" });
-        return res.json(calcularEstado(result[0]));  
+        const [result] = await conmysql.query(
+            `SELECT * FROM locales WHERE id_usuario = ?`,
+            [id_usuario]
+        );
+        if (result.length === 0) {
+            return res.status(404).json({ message: "No existe un local asociado a este usuario" });
+        }
+        return res.json(calcularEstado(result[0]));
     } catch (error) {
         console.error("Error getLocalPorUsuario:", error);
         return res.status(500).json({ message: "Error del servidor", error: error.message });
@@ -42,9 +54,14 @@ export const getLocalPorUsuario = async (req, res) => {
 export const getLocalPorCodigo = async (req, res) => {
     try {
         const { codigo } = req.params;
-        const [result] = await conmysql.query(`SELECT * FROM locales WHERE local_codigo = ?`, [codigo]);
-        if (result.length === 0) return res.status(404).json({ message: "Local no encontrado" });
-        return res.json(calcularEstado(result[0]));  
+        const [result] = await conmysql.query(
+            `SELECT * FROM locales WHERE local_codigo = ?`,
+            [codigo]
+        );
+        if (result.length === 0) {
+            return res.status(404).json({ message: "Local no encontrado" });
+        }
+        return res.json(calcularEstado(result[0]));
     } catch (error) {
         console.error("Error getLocalPorCodigo:", error);
         return res.status(500).json({ message: "Error del servidor", error: error.message });
@@ -55,12 +72,17 @@ export const getLocalPorCodigo = async (req, res) => {
 export const getLocalPorRuc = async (req, res) => {
     try {
         const { ruc } = req.params;
-        const [result] = await conmysql.query(`SELECT * FROM locales WHERE local_ruc = ?`, [ruc]);
-        if (result.length === 0) return res.status(404).json({ message: "Local no encontrado" });
-        return res.json(calcularEstado(result[0]));  
+        const [result] = await conmysql.query(
+            `SELECT * FROM locales WHERE local_ruc = ?`,
+            [ruc]
+        );
+        if (result.length === 0) {
+            return res.status(404).json({ message: "Local no encontrado" });
+        }
+        return res.json(calcularEstado(result[0]));
     } catch (error) {
         console.error("Error getLocalPorRuc:", error);
-        return res.status(500).json({ message: "Local no encontrado", error: error.message });
+        return res.status(500).json({ message: "Error del servidor", error: error.message });
     }
 };
 
@@ -68,8 +90,9 @@ export const getLocalPorRuc = async (req, res) => {
 export const buscarLocales = async (req, res) => {
     try {
         const { nombre } = req.query;
-        if (!nombre) return res.status(400).json({ message: "Debe proporcionar un nombre para buscar" });
-
+        if (!nombre) {
+            return res.status(400).json({ message: "Debe proporcionar un nombre para buscar" });
+        }
         const [result] = await conmysql.query(
             `SELECT * FROM locales WHERE local_nombre_comercial LIKE ? ORDER BY local_nombre_comercial ASC`,
             [`%${nombre}%`]
@@ -82,65 +105,179 @@ export const buscarLocales = async (req, res) => {
 };
 
 // POST: Crear local
+// - No recibe id_estado ni modo manual: se crean en AUTO (default DB)
 export const postLocales = async (req, res) => {
     try {
         const {
-            id_usuario, local_codigo, local_nombre_comercial, local_razon_social, local_ruc,
-            local_descripcion, local_foto, local_telefono, local_email, local_categoria,
-            local_filtro, id_provincia, id_canton, local_direccion, local_referencia,
-            local_latitud, local_longitud, local_calificacion, local_comision_porcentaje,
-            local_tiempo_preparacion_promedio, local_hora_apertura, local_hora_cierre,
-            local_fecha_registro, id_estado
+            id_usuario,
+            local_codigo,
+            local_nombre_comercial,
+            local_razon_social,
+            local_ruc,
+            local_descripcion,
+            local_foto,
+            local_telefono,
+            local_email,
+            local_categoria,
+            local_filtro,
+            id_provincia,
+            id_canton,
+            local_direccion,
+            local_referencia,
+            local_latitud,
+            local_longitud,
+            local_calificacion,
+            local_comision_porcentaje,
+            local_tiempo_preparacion_promedio,
+            local_hora_apertura,
+            local_hora_cierre,
+            local_fecha_registro
         } = req.body;
 
         const [result] = await conmysql.query(
-            `INSERT INTO locales (id_usuario, local_codigo, local_nombre_comercial, local_razon_social, local_ruc, local_descripcion, local_foto, local_telefono, local_email, local_categoria, local_filtro, id_provincia, id_canton, local_direccion, local_referencia, local_latitud, local_longitud, local_calificacion, local_comision_porcentaje, local_tiempo_preparacion_promedio, local_hora_apertura, local_hora_cierre, local_fecha_registro, id_estado)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
+            `INSERT INTO locales (
                 id_usuario, local_codigo, local_nombre_comercial, local_razon_social, local_ruc,
                 local_descripcion, local_foto, local_telefono, local_email, local_categoria,
                 local_filtro, id_provincia, id_canton, local_direccion, local_referencia,
                 local_latitud, local_longitud, local_calificacion, local_comision_porcentaje,
                 local_tiempo_preparacion_promedio, local_hora_apertura, local_hora_cierre,
-                local_fecha_registro, id_estado
+                local_fecha_registro
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id_usuario,
+                local_codigo,
+                local_nombre_comercial,
+                local_razon_social,
+                local_ruc,
+                local_descripcion,
+                local_foto,
+                local_telefono,
+                local_email,
+                local_categoria,
+                local_filtro,
+                id_provincia,
+                id_canton,
+                local_direccion,
+                local_referencia,
+                local_latitud,
+                local_longitud,
+                local_calificacion,
+                local_comision_porcentaje,
+                local_tiempo_preparacion_promedio,
+                local_hora_apertura,
+                local_hora_cierre,
+                local_fecha_registro
             ]
         );
 
-        return res.status(201).json({ id_local: result.insertId, message: "Local registrado con éxito" });
+        const [rows] = await conmysql.query(
+            `SELECT * FROM locales WHERE id_local = ?`,
+            [result.insertId]
+        );
+
+        return res.status(201).json({
+            id_local: result.insertId,
+            message: "Local registrado con éxito",
+            local: calcularEstado(rows[0])
+        });
     } catch (error) {
         console.error("Error postLocales:", error);
         return res.status(500).json({ message: "Error al registrar local", error: error.message });
     }
 };
 
-// PUT: Actualizar completamente un local
+// PUT: Actualización completa (sin tocar estado / modo manual)
 export const putLocales = async (req, res) => {
     try {
         const { id } = req.params;
         const {
-            id_usuario, local_codigo, local_nombre_comercial, local_razon_social, local_ruc,
-            local_descripcion, local_foto, local_telefono, local_email, local_categoria,
-            local_filtro, id_provincia, id_canton, local_direccion, local_referencia,
-            local_latitud, local_longitud, local_calificacion, local_comision_porcentaje,
-            local_tiempo_preparacion_promedio, local_hora_apertura, local_hora_cierre,
+            id_usuario,
+            local_codigo,
+            local_nombre_comercial,
+            local_razon_social,
+            local_ruc,
+            local_descripcion,
+            local_foto,
+            local_telefono,
+            local_email,
+            local_categoria,
+            local_filtro,
+            id_provincia,
+            id_canton,
+            local_direccion,
+            local_referencia,
+            local_latitud,
+            local_longitud,
+            local_calificacion,
+            local_comision_porcentaje,
+            local_tiempo_preparacion_promedio,
+            local_hora_apertura,
+            local_hora_cierre,
             local_fecha_registro
         } = req.body;
 
         const [result] = await conmysql.query(
-            `UPDATE locales SET id_usuario = ?, local_codigo = ?, local_nombre_comercial = ?, local_razon_social = ?, local_ruc = ?, local_descripcion = ?, local_foto = ?, local_telefono = ?, local_email = ?, local_categoria = ?, local_filtro = ?, id_provincia = ?, id_canton = ?, local_direccion = ?, local_referencia = ?, local_latitud = ?, local_longitud = ?, local_calificacion = ?, local_comision_porcentaje = ?, local_tiempo_preparacion_promedio = ?, local_hora_apertura = ?, local_hora_cierre = ?, local_fecha_registro = ? WHERE id_local = ?`,
+            `UPDATE locales SET
+                id_usuario = ?,
+                local_codigo = ?,
+                local_nombre_comercial = ?,
+                local_razon_social = ?,
+                local_ruc = ?,
+                local_descripcion = ?,
+                local_foto = ?,
+                local_telefono = ?,
+                local_email = ?,
+                local_categoria = ?,
+                local_filtro = ?,
+                id_provincia = ?,
+                id_canton = ?,
+                local_direccion = ?,
+                local_referencia = ?,
+                local_latitud = ?,
+                local_longitud = ?,
+                local_calificacion = ?,
+                local_comision_porcentaje = ?,
+                local_tiempo_preparacion_promedio = ?,
+                local_hora_apertura = ?,
+                local_hora_cierre = ?,
+                local_fecha_registro = ?
+             WHERE id_local = ?`,
             [
-                id_usuario, local_codigo, local_nombre_comercial, local_razon_social, local_ruc,
-                local_descripcion, local_foto, local_telefono, local_email, local_categoria,
-                local_filtro, id_provincia, id_canton, local_direccion, local_referencia,
-                local_latitud, local_longitud, local_calificacion, local_comision_porcentaje,
-                local_tiempo_preparacion_promedio, local_hora_apertura, local_hora_cierre,
-                local_fecha_registro, id
+                id_usuario,
+                local_codigo,
+                local_nombre_comercial,
+                local_razon_social,
+                local_ruc,
+                local_descripcion,
+                local_foto,
+                local_telefono,
+                local_email,
+                local_categoria,
+                local_filtro,
+                id_provincia,
+                id_canton,
+                local_direccion,
+                local_referencia,
+                local_latitud,
+                local_longitud,
+                local_calificacion,
+                local_comision_porcentaje,
+                local_tiempo_preparacion_promedio,
+                local_hora_apertura,
+                local_hora_cierre,
+                local_fecha_registro,
+                id
             ]
         );
 
-        if (result.affectedRows === 0) return res.status(404).json({ message: "Local no encontrado" });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "Local no encontrado" });
+        }
 
-        const [rows] = await conmysql.query(`SELECT * FROM locales WHERE id_local = ?`, [id]);
+        const [rows] = await conmysql.query(
+            `SELECT * FROM locales WHERE id_local = ?`,
+            [id]
+        );
         return res.json(calcularEstado(rows[0]));
     } catch (error) {
         console.error("Error putLocales:", error);
@@ -148,59 +285,39 @@ export const putLocales = async (req, res) => {
     }
 };
 
-// PATCH: Actualización parcial de local
-/* export const patchLocales = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const camposPermitidos = [
-            "id_usuario", "local_codigo", "local_nombre_comercial", "local_razon_social", "local_ruc",
-            "local_descripcion", "local_foto", "local_telefono", "local_email", "local_categoria",
-            "local_filtro", "id_provincia", "id_canton", "local_direccion", "local_referencia",
-            "local_latitud", "local_longitud", "local_calificacion", "local_comision_porcentaje",
-            "local_tiempo_preparacion_promedio", "local_hora_apertura", "local_hora_cierre",
-            "local_fecha_registro", "id_estado"
-        ];
-
-        const campos = [], valores = [];
-        for (const campo of camposPermitidos) {
-            if (req.body[campo] !== undefined) {
-                campos.push(`${campo} = ?`);
-                valores.push(req.body[campo]);
-            }
-        }
-
-        if (campos.length === 0) return res.status(400).json({ message: "No se proporcionaron campos para actualizar" });
-
-        valores.push(id);
-        const [result] = await conmysql.query(
-            `UPDATE locales SET ${campos.join(", ")} WHERE id_local = ?`,
-            valores
-        );
-
-        if (result.affectedRows === 0) return res.status(404).json({ message: "Local no encontrado" });
-
-        const [rows] = await conmysql.query(`SELECT * FROM locales WHERE id_local = ?`, [id]);
-        return res.json(rows[0]);
-    } catch (error) {
-        console.error("Error patchLocales:", error);
-        return res.status(500).json({ message: "Error al actualizar local", error: error.message });
-    }
-}; */
-
+// PATCH: Actualización parcial (solo datos de negocio; NO estado/modo)
 export const patchLocales = async (req, res) => {
     try {
         const { id } = req.params;
 
-        // Campos permitidos para actualización parcial
+        // Campos editables (sin id_estado ni modo manual)
         const camposPermitidos = [
-            "local_nombre_comercial", "local_razon_social", "local_ruc", "local_descripcion",
-            "local_foto", "local_telefono", "local_email", "local_categoria", "id_provincia",
-            "id_canton", "local_direccion", "local_referencia", "local_latitud", "local_longitud",
-            "local_hora_apertura", "local_hora_cierre"
+            "local_nombre_comercial",
+            "local_razon_social",
+            "local_ruc",
+            "local_descripcion",
+            "local_foto",
+            "local_telefono",
+            "local_email",
+            "local_categoria",
+            "local_filtro",
+            "id_provincia",
+            "id_canton",
+            "local_direccion",
+            "local_referencia",
+            "local_latitud",
+            "local_longitud",
+            "local_calificacion",
+            "local_comision_porcentaje",
+            "local_tiempo_preparacion_promedio",
+            "local_hora_apertura",
+            "local_hora_cierre",
+            "local_fecha_registro"
         ];
 
-        // Construye dinámicamente el UPDATE con los campos enviados
-        const campos = [], valores = [];
+        const campos = [];
+        const valores = [];
+
         for (const campo of camposPermitidos) {
             if (req.body[campo] !== undefined) {
                 campos.push(`${campo} = ?`);
@@ -209,69 +326,110 @@ export const patchLocales = async (req, res) => {
         }
 
         if (campos.length === 0) {
-            return res.status(400).json({ message: "No se proporcionaron campos válidos para actualizar" });
+            return res.status(400).json({
+                message: "No se proporcionaron campos válidos para actualizar"
+            });
         }
 
         valores.push(Number(id));
-        const sql = `UPDATE locales SET ${campos.join(", ")} WHERE id_local = ?`;
 
+        const sql = `UPDATE locales SET ${campos.join(", ")} WHERE id_local = ?`;
         console.log("📝 SQL PATCH:", sql);
         console.log("📦 Valores:", valores);
 
         const [result] = await conmysql.query(sql, valores);
 
-        // Verifica si el local existe cuando no hubo filas afectadas
         if (result.affectedRows === 0) {
-            const [existe] = await conmysql.query(`SELECT id_local FROM locales WHERE id_local = ?`, [Number(id)]);
-            if (existe.length === 0) return res.status(404).json({ message: "Local no encontrado" });
+            const [existe] = await conmysql.query(
+                `SELECT id_local FROM locales WHERE id_local = ?`,
+                [Number(id)]
+            );
+            if (existe.length === 0) {
+                return res.status(404).json({ message: "Local no encontrado" });
+            }
         }
 
-        // Devuelve el local actualizado
-        const [rows] = await conmysql.query(`SELECT * FROM locales WHERE id_local = ?`, [Number(id)]);
-        return res.json({ message: "Local actualizado correctamente", local: calcularEstado(rows[0])   });
+        const [rows] = await conmysql.query(
+            `SELECT * FROM locales WHERE id_local = ?`,
+            [Number(id)]
+        );
 
+        return res.json({
+            message: "Local actualizado correctamente",
+            local: calcularEstado(rows[0])
+        });
     } catch (error) {
         console.error("❌ Error patchLocales:", error);
         return res.status(500).json({ message: "Error al actualizar local", error: error.message });
     }
 };
 
-// PATCH: Abrir/cerrar manualmente (no toca el horario)
+// PATCH: Abrir/cerrar manualmente (único endpoint que toca el modo)
 export const cambiarEstadoLocal = async (req, res) => {
     try {
-        const { id } = req.params, { id_estado } = req.body;
+        const { id } = req.params;
+        const { id_estado } = req.body;
         const estado = Number(id_estado);
-        if (![1, 2].includes(estado)) return res.status(400).json({ message: "El estado debe ser 1 (ABIERTO) o 2 (CERRADO)" });
 
-        const [rows] = await conmysql.query("SELECT * FROM locales WHERE id_local = ?", [id]);
-        if (rows.length === 0) return res.status(404).json({ message: "Local no encontrado" });
+        if (![1, 2].includes(estado)) {
+            return res.status(400).json({
+                message: "El estado debe ser 1 (ABIERTO) o 2 (CERRADO)"
+            });
+        }
+
+        const [rows] = await conmysql.query(
+            "SELECT * FROM locales WHERE id_local = ?",
+            [id]
+        );
+        if (rows.length === 0) {
+            return res.status(404).json({ message: "Local no encontrado" });
+        }
+
         const local = rows[0];
-
         const quiereAbrir = estado === 1;
         const auto = abiertoPorHorario(local.local_hora_apertura, local.local_hora_cierre);
 
-        let modo, desde = null, hasta = null;
+        let modo;
+        let desde = null;
+        let hasta = null;
+
         if (quiereAbrir === auto) {
-            // Coincide con el horario: se quita el override y vuelve al modo automático
+            // Coincide con el horario → vuelve a AUTO
             modo = "AUTO";
         } else {
             modo = quiereAbrir ? "ABIERTO" : "CERRADO";
             desde = Date.now();
-            // Abierto manual -> dura hasta el cierre automático; cerrado manual -> hasta la apertura automática
-            hasta = proximaOcurrencia(quiereAbrir ? local.local_hora_cierre : local.local_hora_apertura);
+            // Abierto manual → hasta el próximo cierre; cerrado manual → hasta la próxima apertura
+            hasta = proximaOcurrencia(
+                quiereAbrir ? local.local_hora_cierre : local.local_hora_apertura
+            );
         }
 
         await conmysql.query(
-            "UPDATE locales SET local_modo_manual = ?, local_manual_desde = ?, local_manual_hasta = ? WHERE id_local = ?",
+            `UPDATE locales
+             SET local_modo_manual = ?, local_manual_desde = ?, local_manual_hasta = ?
+             WHERE id_local = ?`,
             [modo, desde, hasta, id]
         );
 
-        const [nuevo] = await conmysql.query("SELECT * FROM locales WHERE id_local = ?", [id]);
+        const [nuevo] = await conmysql.query(
+            "SELECT * FROM locales WHERE id_local = ?",
+            [id]
+        );
         const localCalc = calcularEstado(nuevo[0]);
-        return res.json({ message: localCalc.local_abierto ? "Local abierto correctamente" : "Local cerrado correctamente", local: localCalc });
+
+        return res.json({
+            message: localCalc.local_abierto
+                ? "Local abierto correctamente"
+                : "Local cerrado correctamente",
+            local: localCalc
+        });
     } catch (error) {
         console.error("Error cambiarEstadoLocal:", error);
-        return res.status(500).json({ message: "Error al cambiar el estado del local", error: error.message });
+        return res.status(500).json({
+            message: "Error al cambiar el estado del local",
+            error: error.message
+        });
     }
 };
 
@@ -279,8 +437,13 @@ export const cambiarEstadoLocal = async (req, res) => {
 export const deleteLocales = async (req, res) => {
     try {
         const { id } = req.params;
-        const [result] = await conmysql.query(`DELETE FROM locales WHERE id_local = ?`, [id]);
-        if (result.affectedRows === 0) return res.status(404).json({ message: "Local no encontrado" });
+        const [result] = await conmysql.query(
+            `DELETE FROM locales WHERE id_local = ?`,
+            [id]
+        );
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "Local no encontrado" });
+        }
         return res.status(204).send();
     } catch (error) {
         console.error("Error deleteLocales:", error);
