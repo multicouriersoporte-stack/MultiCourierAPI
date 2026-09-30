@@ -39,9 +39,6 @@ import provinciasRoutes from "./routes/provincias.routes.js";
 import cantonesRoutes from "./routes/cantones.routes.js";
 
 import horariosRoutes from "./routes/horarios.routes.js";
-//import intercambiosRoutes from "./routes/intercambios.routes.js";
-//import reservasRoutes from "./routes/reservas.routes.js";
-
 import billeteraclienteRoutes from "./routes/billeteracliente.routes.js";
 import billeteraclientemovimientoRoutes from "./routes/billeteracliente_movimiento.routes.js";
 
@@ -50,6 +47,8 @@ import buscarPedidosRoutes from "./routes/buscarPedidos.routes.js";
 
 import pushRoutes from "./routes/push.routes.js";
 import notificacionesRoutes from "./routes/notificaciones.routes.js";
+
+import chatbotRoutes from "./routes/chatbot.routes.js";
 
 import "./servicios/Generarhorariossemanales.job.js";
 import { iniciarSchedulerEstadosRepartidor } from "./servicios/EstadoRepartidorScheduler.service.js";
@@ -121,9 +120,6 @@ app.use("/api", provinciasRoutes);
 app.use("/api", cantonesRoutes);
 
 app.use("/api", horariosRoutes);
-//app.use("/api", intercambiosRoutes);
-//app.use("/api", reservasRoutes);
-
 app.use("/api", billeteraclienteRoutes);
 app.use("/api", billeteraclientemovimientoRoutes);
 
@@ -131,6 +127,8 @@ app.use("/api", buscarPedidosRoutes);
 
 app.use("/api", pushRoutes);
 app.use("/api", notificacionesRoutes);
+
+app.use("/api", chatbotRoutes);
 
 // PRUEBA API
 app.get("/api", (req, res) => {
