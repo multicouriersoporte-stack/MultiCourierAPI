@@ -228,7 +228,7 @@ export const patchLocales = async (req, res) => {
 
         // Devuelve el local actualizado
         const [rows] = await conmysql.query(`SELECT * FROM locales WHERE id_local = ?`, [Number(id)]);
-        return res.json({ message: "Local actualizado correctamente", return res.json(calcularEstado(rows[0])); });
+        return res.json({ message: "Local actualizado correctamente", local: calcularEstado(rows[0])   });
 
     } catch (error) {
         console.error("❌ Error patchLocales:", error);
