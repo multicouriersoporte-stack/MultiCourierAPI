@@ -48,7 +48,7 @@ import buscarPedidosRoutes from "./routes/buscarPedidos.routes.js";
 import pushRoutes from "./routes/push.routes.js";
 import notificacionesRoutes from "./routes/notificaciones.routes.js";
 
-import chatbotRoutes from "./routes/chatbot.routes.js";
+//import chatbotRoutes from "./routes/chatbot.routes.js";
 
 import "./servicios/Generarhorariossemanales.job.js";
 import { iniciarSchedulerEstadosRepartidor } from "./servicios/EstadoRepartidorScheduler.service.js";
@@ -128,7 +128,7 @@ app.use("/api", buscarPedidosRoutes);
 app.use("/api", pushRoutes);
 app.use("/api", notificacionesRoutes);
 
-app.use("/api", chatbotRoutes);
+//app.use("/api", chatbotRoutes);
 
 // PRUEBA API
 app.get("/api", (req, res) => {
