@@ -18,6 +18,8 @@ import usuariosRoutes from "./routes/usuarios.routes.js";
 import clientesRoutes from "./routes/clientes.routes.js";
 import localesRoutes from "./routes/locales.routes.js";
 import localproductosRoutes from "./routes/localproductos.routes.js";
+import cuponesRoutes from "./routes/cupones.routes.js";
+import descuentosRoutes from "./routes/descuentos.routes.js";
 import pedidosRoutes from "./routes/pedidos.routes.js";
 import pedidodetallesRoutes from "./routes/pedidodetalles.routes.js";
 import pedidorepartidoresRoutes from "./routes/pedidorepartidores.routes.js";
@@ -95,6 +97,8 @@ app.use("/api", estadosrepartidorRoutes);
 app.use("/api", usuariosRoutes);
 app.use("/api", localesRoutes);
 app.use("/api", localproductosRoutes);
+app.use("/api", cuponesRoutes);
+app.use("/api", descuentosRoutes);
 
 app.use("/api", pedidosRoutes);
 app.use("/api", pedidodetallesRoutes);
