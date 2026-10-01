@@ -146,7 +146,7 @@ export async function finalizarHorariosVencidos() {
 
 // Borra horarios (y sus reservas/historial) más viejos que la semana anterior.
 // Solo queda visible: semana anterior + semana actual.
-export async function purgarHistorialAntiguo(fechaLunesActual) {
+/* export async function purgarHistorialAntiguo(fechaLunesActual) {
     const limiteISO = aISO(sumarDias(fechaLunesActual, -7));
     const conn = await conmysql.getConnection();
 
@@ -176,6 +176,70 @@ export async function purgarHistorialAntiguo(fechaLunesActual) {
 
         await conn.commit();
         return { eliminados: borrados.affectedRows };
+    } catch (error) {
+        await conn.rollback();
+        throw error;
+    } finally {
+        conn.release();
+    }
+} */
+
+export async function purgarHistorialAntiguo(fechaLunesActual) {
+    const limiteISO = aISO(sumarDias(fechaLunesActual, -7));
+    const conn = await conmysql.getConnection();
+
+    try {
+        await conn.beginTransaction();
+
+        // 1. Eliminar intercambios ligados a reservas de horarios antiguos.
+        await conn.query(
+            `DELETE hi
+             FROM horario_intercambios hi
+             JOIN horario_reservas hr
+               ON hr.id_reserva = hi.id_reserva_ofrecida
+             JOIN horarios_disponibles hd
+               ON hd.id_horario_disponible = hr.id_horario_disponible
+             WHERE hd.horario_fecha < ?`,
+            [limiteISO]
+        );
+
+        // 2. Eliminar solicitudes de reserva ligadas a horarios antiguos.
+        //    Es necesario hacerlo antes de eliminar horarios_disponibles
+        //    porque existe una FK:
+        //
+        //    horario_solicitudes_reserva.id_horario_disponible
+        //        -> horarios_disponibles.id_horario_dispo
+        await conn.query(
+            `DELETE hsr
+             FROM horario_solicitudes_reserva hsr
+             JOIN horarios_disponibles hd
+               ON hd.id_horario_disponible = hsr.id_horario_disponible
+             WHERE hd.horario_fecha < ?`,
+            [limiteISO]
+        );
+
+        // 3. Eliminar reservas de horarios antiguos.
+        await conn.query(
+            `DELETE hr
+             FROM horario_reservas hr
+             JOIN horarios_disponibles hd
+               ON hd.id_horario_disponible = hr.id_horario_disponible
+             WHERE hd.horario_fecha < ?`,
+            [limiteISO]
+        );
+
+        // 4. Finalmente eliminar los horarios antiguos.
+        const [borrados] = await conn.query(
+            `DELETE FROM horarios_disponibles
+             WHERE horario_fecha < ?`,
+            [limiteISO]
+        );
+
+        await conn.commit();
+
+        return {
+            eliminados: borrados.affectedRows
+        };
     } catch (error) {
         await conn.rollback();
         throw error;
